@@ -29,8 +29,9 @@ its cells (kitty's protocol or iTerm2's), draws each component with a radio
 box, the stuff directory's icon in the header, and rounded borders. The simple
 look, for any other, colors a component's title by its state instead, blue
 added, green to add, red to remove, marks an added one `[present]`, and draws
-bars above and below where the fancy look draws borders. `--look fancy` or `--look simple` chooses; `stuff
---probe` prints what Stuff finds the terminal able to draw.
+bars above and below where the fancy look draws borders. `--look fancy` or
+`--look simple` chooses; `stuff --probe` prints what Stuff finds the terminal
+able to draw.
 
 The stuff directory
 --------------------------------------------------------------------------------
