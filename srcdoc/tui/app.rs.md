@@ -26,7 +26,7 @@ script being in progress.
 
 ### fn refresh
 
-After a run, every exists runs again rather than trusting the plan, and the
+After a run, every present script runs again rather than trusting the plan, and the
 cursor stays on the component it was on.
 
 ## fn run

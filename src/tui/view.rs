@@ -89,7 +89,7 @@ fn select(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
 }
 
 /// A component's card, a row in its border. In the fancy look: its radio box, and its title over its
-/// summary. In the simple look, no box: the title in its mark's color, `[exists]` after it where the
+/// summary. In the simple look, no box: the title in its mark's color, `[present]` after it where the
 /// component is added.
 fn card(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons, i: usize, selected: bool) {
     let component = &app.catalog.components[i];
@@ -103,7 +103,7 @@ fn card(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons, i: 
         shade.map_or(r::Style::new(), |color| r::Style::new().fg(color)).add_modifier(r::Modifier::BOLD),
     );
     if !images && app.added[i] {
-        title.push_span(r::Span::styled(" [exists]", shade.map_or(r::Style::new(), |color| r::Style::new().fg(color))));
+        title.push_span(r::Span::styled(" [present]", shade.map_or(r::Style::new(), |color| r::Style::new().fg(color))));
     }
     let inner = area.inner(r::Margin::new(INSET, 1));
     let indent = u16::try_from(component.depth).unwrap_or(u16::MAX).saturating_mul(INDENT).min(inner.width);

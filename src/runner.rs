@@ -13,7 +13,7 @@ pub(crate) const ENV_COMPONENT_DIR: &str = "COMPONENT_DIR";
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Script {
     /// Exits 0 when the component is added, 1 when not.
-    Exists,
+    Present,
     /// Adds the component.
     Add,
     /// Removes the component.
@@ -24,7 +24,7 @@ impl Script {
     /// The script's file name.
     pub(crate) fn file(self) -> &'static str {
         match self {
-            Self::Exists => "exists.nu",
+            Self::Present => "present.nu",
             Self::Add => "add.nu",
             Self::Remove => "remove.nu",
         }
@@ -100,20 +100,20 @@ impl Runner {
         command
     }
 
-    /// Whether a component is added, as its exists script reports.
-    pub(crate) fn exists(&self, component: &Component) -> RunnerResult<bool> {
+    /// Whether a component is added, as its present script reports.
+    pub(crate) fn present(&self, component: &Component) -> RunnerResult<bool> {
         let output = self
-            .command(component, Script::Exists)
+            .command(component, Script::Present)
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .output()
-            .context(SpawnSnafu { component: &component.id, script: Script::Exists.file() })?;
+            .context(SpawnSnafu { component: &component.id, script: Script::Present.file() })?;
         match output.status.code() {
             Some(0) => Ok(true),
             Some(1) => Ok(false),
             _ => ScriptSnafu {
                 component: &component.id,
-                script: Script::Exists.file(),
+                script: Script::Present.file(),
                 reason: format!(
                     "exited {}: {}",
                     describe(output.status),
@@ -124,15 +124,15 @@ impl Runner {
         }
     }
 
-    /// Every component's exists, run at once.
-    pub(crate) fn exists_all(&self, catalog: &Catalog) -> RunnerResult<Vec<bool>> {
+    /// Every component's present script, run at once.
+    pub(crate) fn present_all(&self, catalog: &Catalog) -> RunnerResult<Vec<bool>> {
         thread::scope(|scope| {
             let checks: Vec<_> = catalog
                 .components
                 .iter()
-                .map(|component| scope.spawn(move || self.exists(component)))
+                .map(|component| scope.spawn(move || self.present(component)))
                 .collect();
-            checks.into_iter().map(|check| check.join().expect("an exists check panicked")).collect()
+            checks.into_iter().map(|check| check.join().expect("a present check panicked")).collect()
         })
     }
 
@@ -204,7 +204,7 @@ impl Runner {
         })
     }
 
-    /// Checks a step's exit, then that exists agrees with what ran.
+    /// Checks a step's exit, then that the present script agrees with what ran.
     fn settle(&self, component: &Component, action: StepAction, status: ExitStatus) -> RunnerResult<()> {
         if !status.success() {
             return ScriptSnafu {
@@ -214,12 +214,12 @@ impl Runner {
             }
             .fail();
         }
-        let added = self.exists(component)?;
+        let added = self.present(component)?;
         if added != (action == StepAction::Add) {
             let state = if added { "added" } else { "not added" };
             return ScriptSnafu {
                 component: &component.id,
-                script: Script::Exists.file(),
+                script: Script::Present.file(),
                 reason: format!("reports {state} after {}", action.label()),
             }
             .fail();

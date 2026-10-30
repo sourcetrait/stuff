@@ -8,8 +8,8 @@ static TESTING: testing::Module = testing::module!(Integration, {
     .using_temp_dir()
 });
 
-/// exists.nu for a component whose state is a marker file in the home.
-const EXISTS: &str = "def main [] {
+/// present.nu for a component whose state is a marker file in the home.
+const PRESENT: &str = "def main [] {
     let marker = ($env.HOME | path join $'($env.COMPONENT_ID | str replace --all \"/\" \"-\").added')
     if ($marker | path exists) { exit 0 } else { exit 1 }
 }
@@ -46,7 +46,7 @@ fn write(path: &Path, text: &str) {
 fn component(dir: &Path, id: &str, config: &str, add: &str) {
     let path = dir.join("component").join(id);
     write(&path.join("config.toml"), config);
-    write(&path.join("exists.nu"), EXISTS);
+    write(&path.join("present.nu"), PRESENT);
     write(&path.join("add.nu"), add);
     write(&path.join("remove.nu"), REMOVE);
 }
@@ -157,12 +157,12 @@ fn a_failing_script_stops_the_run() {
 }
 
 #[tested]
-fn exists_must_agree_with_what_ran() {
+fn present_must_agree_with_what_ran() {
     let t = testing::test!({ .using_temp_dir() });
     let (dir, home) = fixture(t.temp_dir());
     let lied = stuff(&dir, &home, &["add", "liar"]);
     assert!(!lied.status.success());
-    assert!(stderr(&lied).contains("liar exists.nu: reports not added after add"), "{}", stderr(&lied));
+    assert!(stderr(&lied).contains("liar present.nu: reports not added after add"), "{}", stderr(&lied));
 }
 
 #[tested]

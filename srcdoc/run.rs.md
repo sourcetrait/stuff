@@ -2,11 +2,11 @@
 
 ## fn dispatch
 
-The source is taken apart by a `let`, `in` being its one variant; another
-source turns it into a match. Every component's exists runs before anything
-else, the TUI's first screen
-and the CLI's lists and plans alike needing the state. A failing exists
-stops the command: a state it cannot read would make every plan a guess.
+`probe` reports and returns; `in` names the stuff directory. Every
+component's present script runs before anything else, the TUI's first screen
+and the CLI's lists and plans alike needing the state. A failing present
+script stops the command: a state it cannot read would make every plan a
+guess.
 
 ## fn list
 

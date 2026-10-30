@@ -252,7 +252,7 @@ fn collect(
     for path in paths.into_iter().filter(|p| p.is_dir() && p.join(CONFIG_FILE).is_file()) {
         let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         let id = if prefix.is_empty() { name } else { format!("{prefix}/{name}") };
-        for script in [Script::Exists, Script::Add, Script::Remove] {
+        for script in [Script::Present, Script::Add, Script::Remove] {
             if !path.join(script.file()).is_file() {
                 return LayoutSnafu { path: display(&path), reason: format!("{} is missing", script.file()) }
                     .fail();

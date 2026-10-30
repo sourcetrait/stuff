@@ -22,7 +22,7 @@ fn dispatch(cli: Cli) -> Result<ExitCode> {
     };
     let catalog = Catalog::load(&dir)?;
     let runner = Runner::new(&catalog.dir);
-    let added = runner.exists_all(&catalog)?;
+    let added = runner.present_all(&catalog)?;
     let Some(action) = action else {
         return tui::app::run(catalog, runner, added, cli.look);
     };

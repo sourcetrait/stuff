@@ -26,7 +26,7 @@ The TUI has two looks. The fancy look, for a terminal that scales images to
 its cells (kitty's protocol or iTerm2's), draws each component with a radio
 box, the stuff directory's icon in the header, and rounded borders. The simple
 look, for any other, colors a component's title by its state instead, blue
-added, green to add, red to remove, marks an added one `[exists]`, and draws
+added, green to add, red to remove, marks an added one `[present]`, and draws
 bars above and below where the fancy look draws borders. `--look fancy` or `--look simple` chooses; `stuff
 probe` prints what Stuff finds the terminal able to draw.
 
@@ -39,7 +39,7 @@ The stuff directory
   logo.png              the icon, an image with transparency
   component/<component>/
     config.toml         title, description (80 characters at most), depends
-    exists.nu           exits 0 when the component is added, 1 when not
+    present.nu          exits 0 when the component is added, 1 when not
     add.nu              adds it
     remove.nu           removes it
     <subcomponent>/     the same, to any depth
@@ -56,7 +56,7 @@ the fancy look.
 Each script is a `def main` with no arguments, run by nu from its component's
 directory with your own nushell `env.nu` and `config.nu`, and with
 `STUFF_DIR`, `COMPONENT_ID`, and `COMPONENT_DIR` set. After an add or a
-remove, `exists.nu` runs again to confirm it, and a run stops at the first
+remove, `present.nu` runs again to confirm it, and a run stops at the first
 failure.
 
 License (AGPL3)

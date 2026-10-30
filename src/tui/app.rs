@@ -314,7 +314,7 @@ fn drive(
                 runner.spawn_plan(&app.catalog, &app.plan, sender.clone());
             }
             Some(Request::Refresh) => {
-                let added = runner.exists_all(&app.catalog)?;
+                let added = runner.present_all(&app.catalog)?;
                 app.refresh(added);
             }
             None => {}

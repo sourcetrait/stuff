@@ -92,7 +92,7 @@ pub enum RunnerError {
     /// nu failed to start.
     #[snafu(display("{component} {script}: starting nu: {source}"))]
     Spawn { component: String, script: String, source: std::io::Error },
-    /// A script failed, or exists disagreed with what ran.
+    /// A script failed, or the present script disagreed with what ran.
     #[snafu(display("{component} {script}: {reason}"))]
     Script { component: String, script: String, reason: String },
 }

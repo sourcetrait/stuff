@@ -13,15 +13,15 @@ stdin is null: a script cannot prompt, so a run never waits on input the TUI
 cannot give it. The script runs from its component's directory, so a
 relative path in it is the component's own.
 
-### fn exists
+### fn present
 
 Exit 0 is added and 1 is not; any other exit is an error carrying the
 script's stderr, since a state that cannot be read must not be taken as
 either.
 
-### fn exists_all
+### fn present_all
 
-Each exists runs on a thread of its own: nu's start, its config included,
+Each present script runs on a thread of its own: nu's start, its config included,
 dominates the time, and the checks are independent.
 
 ### fn step_piped
@@ -32,7 +32,7 @@ stream, the way a terminal shows them.
 
 ### fn settle
 
-After a step exits 0, exists runs again: a script that claims success
+After a step exits 0, the present script runs again: a script that claims success
 without the state to show for it fails the run.
 
 ## fn config_flags
