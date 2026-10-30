@@ -20,6 +20,12 @@ addition that needs what it takes, so the two sets never conflict.
 
 ### fn key
 
+A key is made its arrow first: `w` `a` `s` `d`, helix's `k` `h` `j` `l`, and
+the arrows move alike, and `q` is escape on every screen, so each screen
+matches arrows, enter, escape, space, and tab alone. The preview scrolls until
+its last line sits at the body's bottom, the body's rows taken from the last
+frame drawn.
+
 Escape on the dialog is cancel, back to the preview; enter on a focused
 cancel does the same. The run screen holds its keys until the run ends, a
 script being in progress.

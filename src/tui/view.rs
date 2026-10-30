@@ -8,13 +8,15 @@ pub(crate) const PURPLE: r::Color = r::Color::Rgb(160, 100, 240);
 pub(crate) const QUIET: r::Color = r::Color::DarkGray;
 /// In the simple look, the title's color of an added component: blue.
 const ADDED: r::Color = r::Color::Rgb(90, 150, 255);
-/// In the simple look, the title's color of a component to add: green.
+/// The color of a component to add: green, its title's in the simple look and the preview's rule.
 const TO_ADD: r::Color = r::Color::Rgb(70, 200, 110);
-/// In the simple look, the title's color of a component to remove: red.
+/// The color of a component to remove: red, its title's in the simple look and the preview's rule.
 const TO_REMOVE: r::Color = r::Color::Rgb(235, 85, 85);
 /// The list's legend.
 pub(crate) const LEGEND_SELECT: &str = "<< [esc]     [w][a][s][d] [space]     [enter] >>";
-/// The legend of the preview and the finished run.
+/// The preview's legend.
+pub(crate) const LEGEND_PREVIEW: &str = "<< [esc]     [w][s]     [enter] >>";
+/// The legend of the dialog and the finished run.
 pub(crate) const LEGEND_STEP: &str = "<< [esc]     [enter] >>";
 /// A card's rows: its two lines within its border's.
 const CARD_ROWS: u16 = 4;
@@ -28,14 +30,14 @@ const GAP: u16 = 1;
 /// lines up under its parent's title.
 pub(crate) const INDENT: u16 = tui::icon::ICON_SIZE.width + GAP;
 
+/// The screen's three regions: the header, the body, and the legend.
+pub(crate) fn regions(area: r::Rect) -> [r::Rect; 3] {
+    r::Layout::vertical([r::Constraint::Length(3), r::Constraint::Min(1), r::Constraint::Length(1)]).areas(area)
+}
+
 /// Draws the screen showing.
 pub(crate) fn draw(frame: &mut ratatui::Frame, app: &App, icons: &Icons) {
-    let [head, body, foot] = r::Layout::vertical([
-        r::Constraint::Length(3),
-        r::Constraint::Min(1),
-        r::Constraint::Length(1),
-    ])
-    .areas(frame.area());
+    let [head, body, foot] = regions(frame.area());
     header(frame, head, app, icons);
     match app.screen {
         Screen::Select => select(frame, body, app, icons),
@@ -157,24 +159,41 @@ fn border(frame: &mut ratatui::Frame, area: r::Rect, look: Look, color: r::Color
     frame.render_widget(if let Some(title) = title { block.title(title) } else { block }, area);
 }
 
-/// The preview: each step, a green add or a red remove, in the order it runs.
+/// The preview, scrolled by the app's scroll.
 fn preview(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
-    let steps: Vec<r::Line> = app
-        .plan
-        .steps
-        .iter()
-        .map(|step| {
-            let color = match step.action {
-                StepAction::Add => r::Color::Green,
-                StepAction::Remove => r::Color::Red,
-            };
-            r::Line::from(vec![
-                r::Span::styled(format!("[{}]", step.action.label()), r::Style::new().fg(color)),
-                r::Span::raw(format!(" {}", app.catalog.components[step.component].title)),
-            ])
-        })
-        .collect();
-    frame.render_widget(r::Paragraph::new(steps), area.inner(r::Margin::new(INSET, 0)));
+    let area = area.inner(r::Margin::new(INSET, 0));
+    frame.render_widget(r::Paragraph::new(preview_lines(app, area.width)).scroll((app.scroll, 0)), area);
+}
+
+/// The preview's lines: a section for what will be installed and one for what will be uninstalled,
+/// each a heading, a sentence, a rule in its color as wide as given, and its components in the order
+/// they run; a section with none is left out.
+pub(crate) fn preview_lines(app: &App, width: u16) -> Vec<r::Line<'_>> {
+    let sections = [
+        (StepAction::Add, "Installing", "The following components will be installed", TO_ADD),
+        (StepAction::Remove, "Uninstalling", "The following components will be uninstalled", TO_REMOVE),
+    ];
+    let mut lines = Vec::new();
+    for (action, heading, sentence, color) in sections {
+        let mut titles = app
+            .plan
+            .steps
+            .iter()
+            .filter(|step| step.action == action)
+            .map(|step| app.catalog.components[step.component].title.as_str())
+            .peekable();
+        if titles.peek().is_none() {
+            continue;
+        }
+        if !lines.is_empty() {
+            lines.push(r::Line::default());
+        }
+        lines.push(r::Line::styled(heading, r::Style::new().add_modifier(r::Modifier::BOLD)));
+        lines.push(r::Line::raw(sentence));
+        lines.push(r::Line::styled("─".repeat(usize::from(width)), r::Style::new().fg(color)));
+        lines.extend(titles.map(|title| r::Line::raw(format!("  {title}"))));
+    }
+    lines
 }
 
 /// The proceed dialog, centered over the screen, its focused button purple.
@@ -242,6 +261,7 @@ fn run(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
 fn legend(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
     let text = match app.screen {
         Screen::Select => LEGEND_SELECT,
+        Screen::Preview => LEGEND_PREVIEW,
         Screen::Run if app.running => "",
         _ => LEGEND_STEP,
     };

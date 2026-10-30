@@ -19,8 +19,10 @@ stuff probe                            what the terminal can draw
 
 `in` names the source: the components in a stuff directory.
 
-In the TUI, `w` `a` `s` `d` move, space marks a component to add or remove,
-enter goes on, and escape goes back or quits.
+In the TUI, `w` `a` `s` `d` move, as do helix's `k` `h` `j` `l` and the
+arrows; space marks a component to add or remove, enter goes on, and escape
+or `q` goes back or quits. The preview lists what will be installed and what
+will be uninstalled, `w` and `s` scrolling a long one.
 
 The TUI has two looks. The fancy look, for a terminal that scales images to
 its cells (kitty's protocol or iTerm2's), draws each component with a radio

@@ -49,6 +49,18 @@ line. The fancy look draws rounded borders; the simple look draws the top and
 bottom alone, bars above and below the cursor's card, the dialog, and the
 output.
 
+## fn regions
+
+The header, the body, and the legend, split once for the frame and once for
+the loop, which bounds the preview's scroll by the body's rows.
+
+## fn preview_lines
+
+What will be installed, then what will be uninstalled, each a heading, a
+sentence, a rule in the color of its action, and its components in the order
+they run, a section with none left out. The app counts the same lines to bound
+its scroll, the rule's width mattering only to the drawing.
+
 ## fn confirm
 
 The dialog draws over the preview after a clear, so the preview stays as its

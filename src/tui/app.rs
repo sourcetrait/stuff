@@ -93,6 +93,10 @@ pub(crate) struct App {
     pub(crate) failure: Option<String>,
     /// How the TUI looks.
     pub(crate) look: Look,
+    /// The preview's first line showing.
+    pub(crate) scroll: u16,
+    /// The body's rows at the last frame, which bound the preview's scroll.
+    pub(crate) body_rows: u16,
 }
 
 impl App {
@@ -115,6 +119,8 @@ impl App {
             running: false,
             failure: None,
             look: Look::Simple,
+            scroll: 0,
+            body_rows: 0,
         };
         app.remark();
         app
@@ -148,26 +154,38 @@ impl App {
         self.remark();
     }
 
-    /// Applies a key, returning what the loop must do beyond the state.
+    /// Applies a key, returning what the loop must do beyond the state. `w` `a` `s` `d`, helix's
+    /// `k` `h` `j` `l`, and the arrows move alike, and `q` is escape.
     pub(crate) fn key(&mut self, code: r::KeyCode) -> Option<Request> {
         use r::KeyCode::{Char, Down, Enter, Esc, Left, Right, Tab, Up};
+        let code = match code {
+            Char('w' | 'k') => Up,
+            Char('s' | 'j') => Down,
+            Char('a' | 'h') => Left,
+            Char('d' | 'l') => Right,
+            Char('q') => Esc,
+            other => other,
+        };
         match self.screen {
             Screen::Select => match code {
-                Char('w') | Up => self.cursor = self.cursor.saturating_sub(1),
-                Char('s') | Down => self.cursor = (self.cursor + 1).min(self.order.len().saturating_sub(1)),
-                Char('a') | Left => self.climb(),
-                Char('d') | Right => self.descend(),
+                Up => self.cursor = self.cursor.saturating_sub(1),
+                Down => self.cursor = (self.cursor + 1).min(self.order.len().saturating_sub(1)),
+                Left => self.climb(),
+                Right => self.descend(),
                 Char(' ') => self.toggle(),
                 Enter => {
                     self.plan = Plan::new(&self.catalog, &self.added, &self.adds, &self.removes);
                     if !self.plan.is_empty() {
+                        self.scroll = 0;
                         self.screen = Screen::Preview;
                     }
                 }
-                Esc | Char('q') => return Some(Request::Quit),
+                Esc => return Some(Request::Quit),
                 _ => {}
             },
             Screen::Preview => match code {
+                Up => self.scroll = self.scroll.saturating_sub(1),
+                Down => self.scroll = (self.scroll + 1).min(self.scroll_limit()),
                 Enter => {
                     self.button = Button::Cancel;
                     self.screen = Screen::Confirm;
@@ -176,8 +194,8 @@ impl App {
                 _ => {}
             },
             Screen::Confirm => match code {
-                Char('a') | Left => self.button = Button::Cancel,
-                Char('d') | Right => self.button = Button::Proceed,
+                Left => self.button = Button::Cancel,
+                Right => self.button = Button::Proceed,
                 Tab => {
                     self.button = match self.button {
                         Button::Cancel => Button::Proceed,
@@ -202,6 +220,12 @@ impl App {
             }
         }
         None
+    }
+
+    /// How far the preview scrolls: until its last line sits at the body's bottom.
+    fn scroll_limit(&self) -> u16 {
+        let lines = u16::try_from(tui::view::preview_lines(self, 0).len()).unwrap_or(u16::MAX);
+        lines.saturating_sub(self.body_rows)
     }
 
     /// Applies a run's event.
@@ -296,7 +320,9 @@ fn drive(
         while let Ok(event) = events.try_recv() {
             app.event(event);
         }
-        terminal.draw(|frame| tui::view::draw(frame, &app, icons)).context(TerminalSnafu)?;
+        let area = terminal.draw(|frame| tui::view::draw(frame, &app, icons)).context(TerminalSnafu)?.area;
+        let [_, body, _] = tui::view::regions(area);
+        app.body_rows = body.height;
         if !ratatui::crossterm::event::poll(TICK).context(TerminalSnafu)? {
             continue;
         }
