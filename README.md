@@ -9,15 +9,15 @@ Usage
 --------------------------------------------------------------------------------
 
 ```
-stuff in <dir>                         the TUI
-stuff in <dir> add                     lists the components not added
-stuff in <dir> remove                  lists the components added
-stuff in <dir> add <components>...     adds them, with what they depend on
-stuff in <dir> remove <components>...  removes them, with what depends on them
-stuff probe                            what the terminal can draw
+stuff <dir>                         the TUI
+stuff <dir> add                     lists the components not added
+stuff <dir> remove                  lists the components added
+stuff <dir> add <components>...     adds them, with what they depend on
+stuff <dir> remove <components>...  removes them, with what depends on them
+stuff --probe                       what the terminal can draw
 ```
 
-`in` names the source: the components in a stuff directory.
+The source is a stuff directory, one holding a `config.toml`.
 
 In the TUI, `w` `a` `s` `d` move, as do helix's `k` `h` `j` `l` and the
 arrows; space marks a component to add or remove, enter goes on, and escape
@@ -30,7 +30,7 @@ box, the stuff directory's icon in the header, and rounded borders. The simple
 look, for any other, colors a component's title by its state instead, blue
 added, green to add, red to remove, marks an added one `[present]`, and draws
 bars above and below where the fancy look draws borders. `--look fancy` or `--look simple` chooses; `stuff
-probe` prints what Stuff finds the terminal able to draw.
+--probe` prints what Stuff finds the terminal able to draw.
 
 The stuff directory
 --------------------------------------------------------------------------------

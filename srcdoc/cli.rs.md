@@ -2,15 +2,10 @@
 
 ## struct Cli
 
-`--look` is global, so it may come anywhere on the line, and it overrides the
-look the terminal gets.
-
-## enum CliCommand
-
-The first word names where the components come from, so the directory and the
-action read as a sentence: `stuff in <dir> add rust`. `in` is a stuff
-directory; another source is another variant. `probe` stands apart, a report
-on the terminal rather than work on components.
+The source comes first and the action after, so a line reads as a sentence:
+`stuff <dir> add rust`. `--look` is global, so it may come anywhere on the
+line, and it overrides the look the terminal gets; `--probe` stands alone, a
+report on the terminal rather than work on components.
 
 ## enum CliAction
 

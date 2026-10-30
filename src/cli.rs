@@ -9,24 +9,15 @@ pub(crate) struct Cli {
     /// How the TUI looks: fancy or simple; by default fancy where the terminal scales images to its cells.
     #[arg(long, global = true, value_enum)]
     pub(crate) look: Option<Look>,
-    /// What to do.
-    #[command(subcommand)]
-    pub(crate) command: CliCommand,
-}
-
-/// What to do: work on the components from a source, or report what the terminal can draw.
-#[derive(Debug, clap::Subcommand)]
-pub(crate) enum CliCommand {
-    /// The components in a stuff directory.
-    In {
-        /// The stuff directory.
-        dir: PathBuf,
-        /// The action; none opens the TUI.
-        #[command(subcommand)]
-        action: Option<CliAction>,
-    },
     /// Reports what the terminal can draw: its look, graphics protocol, and cell size.
-    Probe,
+    #[arg(long, exclusive = true)]
+    pub(crate) probe: bool,
+    /// The stuff: a stuff directory.
+    #[arg(required_unless_present = "probe")]
+    pub(crate) source: Option<PathBuf>,
+    /// The action; none opens the TUI.
+    #[command(subcommand)]
+    pub(crate) action: Option<CliAction>,
 }
 
 /// An action on components.

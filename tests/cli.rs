@@ -67,7 +67,6 @@ fn fixture(root: &Path) -> (std::path::PathBuf, std::path::PathBuf) {
 
 fn stuff(dir: &Path, home: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_stuff"))
-        .arg("in")
         .arg(dir)
         .args(args)
         .env("HOME", home)
@@ -85,17 +84,12 @@ fn stderr(output: &Output) -> String {
 }
 
 #[tested]
-fn a_source_comes_before_the_directory() {
+fn a_directory_without_stuff_is_unknown_stuff() {
     let t = testing::test!({ .using_temp_dir() });
-    let (dir, home) = fixture(t.temp_dir());
-    let refused = Command::new(env!("CARGO_BIN_EXE_stuff"))
-        .arg(&dir)
-        .arg("add")
-        .env("HOME", &home)
-        .output()
-        .expect("the stuff binary runs");
+    let (_, home) = fixture(t.temp_dir());
+    let refused = stuff(&home, &home, &["add"]);
     assert!(!refused.status.success());
-    assert!(stderr(&refused).contains("unrecognized subcommand"), "{}", stderr(&refused));
+    assert!(stderr(&refused).contains("what stuff?"), "{}", stderr(&refused));
 }
 
 #[tested]

@@ -9,6 +9,11 @@ pub(crate) const CONFIG_FILE: &str = "config.toml";
 /// The icon the stuff directory may carry.
 pub(crate) const LOGO_FILE: &str = "logo.png";
 
+/// Whether a path is a stuff directory: a directory holding its config.toml.
+pub(crate) fn holds_stuff(path: &Path) -> bool {
+    path.join(CONFIG_FILE).is_file()
+}
+
 /// A component as found, its dependencies still names.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ComponentSpec {

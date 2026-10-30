@@ -29,11 +29,11 @@ pub(crate) mod r {
 
 pub(crate) use crate::{
     catalog::{Catalog, Component},
-    cli::{Cli, CliActionKind, CliCommand},
+    cli::{Cli, CliActionKind},
     config::{ComponentConfig, ComponentConfigToml, StuffConfig, StuffConfigToml},
     error::{
         CatalogResult, GraphSnafu, LayoutSnafu, ParseSnafu, ReadSnafu, RunnerResult, ScriptSnafu,
-        SpawnSnafu, TerminalSnafu, UnknownSnafu,
+        SpawnSnafu, TerminalSnafu, UnknownSnafu, UnknownStuffSnafu,
     },
     plan::{Plan, Step, StepAction},
     runner::{RunEvent, Runner, Script},

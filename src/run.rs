@@ -14,16 +14,19 @@ pub fn run() -> ExitCode {
     }
 }
 
-/// Loads the source, then runs the TUI or the action named.
+/// Reports on the terminal, or loads the stuff, then runs the TUI or the action named.
 fn dispatch(cli: Cli) -> Result<ExitCode> {
-    let (dir, action) = match cli.command {
-        CliCommand::In { dir, action } => (dir, action),
-        CliCommand::Probe => return tui::look::probe(),
-    };
-    let catalog = Catalog::load(&dir)?;
+    if cli.probe {
+        return tui::look::probe();
+    }
+    let source = cli.source.unwrap_or_default();
+    if !crate::catalog::holds_stuff(&source) {
+        return UnknownStuffSnafu { name: source.display().to_string() }.fail();
+    }
+    let catalog = Catalog::load(&source)?;
     let runner = Runner::new(&catalog.dir);
     let added = runner.present_all(&catalog)?;
-    let Some(action) = action else {
+    let Some(action) = cli.action else {
         return tui::app::run(catalog, runner, added, cli.look);
     };
     let kind = action.kind();

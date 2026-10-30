@@ -2,7 +2,8 @@
 
 ## fn dispatch
 
-`probe` reports and returns; `in` names the stuff directory. Every
+`--probe` reports and returns. The source is a stuff directory when it holds
+a config.toml; any other is `what stuff?`, the source named. Every
 component's present script runs before anything else, the TUI's first screen
 and the CLI's lists and plans alike needing the state. A failing present
 script stops the command: a state it cannot read would make every plan a

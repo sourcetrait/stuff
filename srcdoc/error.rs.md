@@ -6,6 +6,10 @@ The crate's error wraps each module's transparently, so its message is the
 module error's own: a command's stderr reads `stuff: <the failure>` with no
 layer of prefixes.
 
+### UnknownStuff
+
+`what stuff?` and the source as given, a source Stuff can't take as stuff.
+
 ## enum RunnerError
 
 ### Script

@@ -20,6 +20,9 @@ pub enum Error {
     /// The terminal failed to draw or read a key.
     #[snafu(display("terminal: {source}"))]
     Terminal { source: std::io::Error },
+    /// The source named is no stuff Stuff knows: not a stuff directory.
+    #[snafu(display("what stuff? {name:?}"))]
+    UnknownStuff { name: String },
 }
 
 /// The kind of an [`Error`].
@@ -28,6 +31,7 @@ pub enum ErrorKind {
     Catalog,
     Runner,
     Terminal,
+    UnknownStuff,
 }
 
 impl Error {
@@ -37,6 +41,7 @@ impl Error {
             Self::Catalog { .. } => ErrorKind::Catalog,
             Self::Runner { .. } => ErrorKind::Runner,
             Self::Terminal { .. } => ErrorKind::Terminal,
+            Self::UnknownStuff { .. } => ErrorKind::UnknownStuff,
         }
     }
 }
