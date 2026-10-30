@@ -11,5 +11,5 @@ touching it, its corners clipped to the border's curve.
 ## const SIDE, fn enlarged
 
 ratatui-image fits an image into its cells by scaling it down, never up, so
-every image starts larger than any cell size makes its cells, and a bitmap is
+every image starts larger than any cell size makes its cells, and a bmp is
 enlarged pixel for pixel to that size first.

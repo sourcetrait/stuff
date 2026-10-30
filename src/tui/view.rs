@@ -6,8 +6,14 @@ use crate::*;
 pub(crate) const PURPLE: r::Color = r::Color::Rgb(160, 100, 240);
 /// The color of the legend and other quiet text.
 pub(crate) const QUIET: r::Color = r::Color::DarkGray;
-/// The plain tier's stand-in for a purple border: a dark purple behind the cursor's row and the dialog.
+/// The plain tier's stand-in for the dialog's purple border: a dark purple behind it.
 const TINT: r::Color = r::Color::Rgb(48, 32, 76);
+/// Below the image tier, the background of an added component's row: dark blue.
+const ADDED: r::Color = r::Color::Rgb(26, 44, 86);
+/// Below the image tier, the background of the row of a component to add: dark green.
+const TO_ADD: r::Color = r::Color::Rgb(24, 70, 36);
+/// Below the image tier, the background of the row of a component to remove: dark red.
+const TO_REMOVE: r::Color = r::Color::Rgb(88, 28, 28);
 /// The list's legend.
 pub(crate) const LEGEND_SELECT: &str = "<< [esc]     [w][a][s][d] [space]     [enter] >>";
 /// The legend of the preview and the finished run.
@@ -45,15 +51,20 @@ pub(crate) fn draw(frame: &mut ratatui::Frame, app: &App, icons: &Icons) {
     legend(frame, foot, app);
 }
 
-/// The header, a row: the configuration's icon, and its title over the directory.
+/// The header, a row: the configuration's icon in the image tier, and its title over the directory.
 fn header(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
     let [row, _] = r::Layout::vertical([r::Constraint::Length(2), r::Constraint::Fill(1)])
         .areas(area.inner(r::Margin::new(INSET, 0)));
-    let [icon_area, lines_area] =
-        r::Layout::horizontal([r::Constraint::Length(tui::icon::ICON_SIZE.width), r::Constraint::Fill(1)])
-            .spacing(GAP)
-            .areas(row);
-    icon(frame, icon_area, icons.header.as_ref());
+    let lines_area = if app.tier == Tier::Image {
+        let [icon_area, lines_area] =
+            r::Layout::horizontal([r::Constraint::Length(tui::icon::ICON_SIZE.width), r::Constraint::Fill(1)])
+                .spacing(GAP)
+                .areas(row);
+        image(frame, icon_area, icons.header.as_ref());
+        lines_area
+    } else {
+        row
+    };
     lines(
         frame,
         lines_area,
@@ -78,30 +89,60 @@ fn select(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
     }
 }
 
-/// A component's card, a row in its border: its radio box, its icon, and its title over its summary.
+/// A component's card, a row in its border. In the image tier: its radio box, its icon, and its
+/// title over its summary. Below it, no box or icon: the row's background in its mark's color.
 fn card(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons, i: usize, selected: bool) {
     let component = &app.catalog.components[i];
+    let shaded = area.inner(r::Margin::new(1, 1));
+    if app.tier != Tier::Image
+        && let Some(shade) = shade(app.marks[i])
+    {
+        frame.render_widget(r::Block::new().style(r::Style::new().bg(shade)), shaded);
+    }
     if selected {
-        border(frame, area, app.tier, PURPLE, None, Some(TINT));
+        match app.tier {
+            Tier::Plain => {
+                for x in [area.left(), area.right().saturating_sub(1)] {
+                    let bar = r::Rect { x, width: area.width.min(1), ..shaded };
+                    frame.render_widget(r::Block::new().style(r::Style::new().bg(PURPLE)), bar);
+                }
+            }
+            _ => border(frame, area, app.tier, PURPLE, None, None),
+        }
     }
     let inner = area.inner(r::Margin::new(INSET, 1));
     let indent = u16::try_from(component.depth).unwrap_or(u16::MAX).saturating_mul(INDENT).min(inner.width);
     let row = r::Rect { x: inner.x + indent, width: inner.width - indent, ..inner };
-    let [radio_area, icon_area, lines_area] = r::Layout::horizontal([
-        r::Constraint::Length(tui::icon::ICON_SIZE.width),
-        r::Constraint::Length(tui::icon::ICON_SIZE.width),
-        r::Constraint::Fill(1),
-    ])
-    .spacing(GAP)
-    .areas(row);
-    icon(frame, radio_area, Some(icons.radios.get(app.marks[i])));
-    icon(frame, icon_area, icons.components.get(i).and_then(Option::as_ref));
+    let lines_area = if let Some(radios) = icons.radios.as_ref().filter(|_| app.tier == Tier::Image) {
+        let [radio_area, icon_area, lines_area] = r::Layout::horizontal([
+            r::Constraint::Length(tui::icon::ICON_SIZE.width),
+            r::Constraint::Length(tui::icon::ICON_SIZE.width),
+            r::Constraint::Fill(1),
+        ])
+        .spacing(GAP)
+        .areas(row);
+        image(frame, radio_area, radios.get(app.marks[i]));
+        image(frame, icon_area, icons.components.get(i).and_then(Option::as_ref));
+        lines_area
+    } else {
+        row
+    };
     lines(
         frame,
         lines_area,
         r::Line::styled(component.title.as_str(), r::Style::new().add_modifier(r::Modifier::BOLD)),
         r::Line::styled(component.description.as_str(), r::Style::new().fg(r::Color::Gray)),
     );
+}
+
+/// The background a mark gives its row below the image tier.
+fn shade(mark: Mark) -> Option<r::Color> {
+    match mark {
+        Mark::Absent => None,
+        Mark::Added => Some(ADDED),
+        Mark::ToAdd => Some(TO_ADD),
+        Mark::ToRemove => Some(TO_REMOVE),
+    }
 }
 
 /// A row's two lines, one over the other.
@@ -111,13 +152,10 @@ fn lines(frame: &mut ratatui::Frame, area: r::Rect, top: r::Line, bottom: r::Lin
     frame.render_widget(bottom, bottom_area);
 }
 
-/// An icon or a radio box in its cells: an image, half-block pixels, or a filled box.
-fn icon(frame: &mut ratatui::Frame, area: r::Rect, icon: Option<&Icon>) {
-    match icon {
-        Some(Icon::Image(protocol)) => frame.render_widget(r::Image::new(protocol), area),
-        Some(Icon::Pixels(pixels)) => frame.render_widget(pixels, area),
-        Some(Icon::Fill(color)) => frame.render_widget(r::Block::new().style(r::Style::new().bg(*color)), area),
-        None => {}
+/// An icon or a radio box in its cells, an image through the graphics protocol.
+fn image(frame: &mut ratatui::Frame, area: r::Rect, protocol: Option<&r::Protocol>) {
+    if let Some(protocol) = protocol {
+        frame.render_widget(r::Image::new(protocol), area);
     }
 }
 

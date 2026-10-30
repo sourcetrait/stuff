@@ -23,12 +23,14 @@ In the TUI, `w` `a` `s` `d` move, space marks a component to add or remove,
 enter goes on, and escape goes back or quits.
 
 The TUI draws in the tier of what the terminal does well. The image tier, for
-a terminal with a graphics protocol (kitty's, sixel, or iTerm2's), draws
-rounded lines and images. The lines tier, for a terminal known to draw its own
-line characters, draws rounded lines and colors. The plain tier, for any
-other, draws colors alone, tinting where it would draw a border. `--tier
-image`, `--tier lines`, or `--tier plain` chooses; `stuff probe` prints what
-Stuff finds the terminal able to draw.
+a terminal with a graphics protocol (kitty's, sixel, or iTerm2's), draws each
+component with a radio box and an icon, and rounded lines. Below it, a
+component's row takes the color of its state instead, dark blue added, dark
+green to add, dark red to remove: the lines tier, for a terminal known to draw
+its own line characters, frames the cursor's row with rounded lines; the plain
+tier, for any other, marks it with purple bars. `--tier image`, `--tier
+lines`, or `--tier plain` chooses; `stuff probe` prints what Stuff finds the
+terminal able to draw.
 
 The stuff directory
 --------------------------------------------------------------------------------
@@ -53,11 +55,9 @@ subcomponent depends on its parent, and `depends` names any other components
 it needs. A component's `config.toml` may hold keys of its own for its
 scripts to read.
 
-An icon comes as `logo.png`, an image with transparency, and as `logo.bmp`, a
-bitmap four pixels square, its black and transparent pixels clear. The image
-tier shows the png, else the bmp, else the default png, a component's icon in
-a rounded frame. The other tiers draw the bmp, else the default bmp, in
-half-block pixels, two to a cell, one over the other.
+An icon is a `logo.png`, an image with transparency, else a `logo.bmp`, else
+the default; a component's icon sits in a rounded frame, its square's edges
+touching the frame. Icons show in the image tier alone.
 
 Each script is a `def main` with no arguments, run by nu from its component's
 directory with your own nushell `env.nu` and `config.nu`, and with

@@ -25,18 +25,26 @@ still spanning the whole width.
 
 ## fn radio
 
-## fn icon
+## fn card, fn shade
 
-An icon and a radio box draw the same way: an image through the graphics
-protocol, half-block pixels, or a box filled with a color.
+Below the image tier a card has no box or icon: the background of its two
+lines takes its mark's color, dark blue added, dark green to add, dark red to
+remove, and the blank rows between cards keep the colors apart. The cursor's
+card has its rounded border in the lines tier; in the plain tier, which draws
+no line character, purple bars at the row's ends, a cell's background filling
+the cell in every terminal.
+
+## fn image
+
+An icon and a radio box draw the same way, an image through the graphics
+protocol.
 
 ## fn border
 
 A terminal that draws box-drawing characters from its font, rather than
 filling their cells itself, can leave a gap between the rows of a vertical
 line. The image and lines tiers draw rounded lines; the plain tier draws no
-line character, tinting the cursor's row and the dialog instead, a cell's
-background filling the cell in every terminal.
+line character, tinting the dialog instead.
 
 ## fn confirm
 
