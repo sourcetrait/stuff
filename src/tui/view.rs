@@ -8,12 +8,12 @@ pub(crate) const PURPLE: r::Color = r::Color::Rgb(160, 100, 240);
 pub(crate) const QUIET: r::Color = r::Color::DarkGray;
 /// The plain tier's stand-in for the dialog's purple border: a dark purple behind it.
 const TINT: r::Color = r::Color::Rgb(48, 32, 76);
-/// Below the image tier, the background of an added component's row: dark blue.
-const ADDED: r::Color = r::Color::Rgb(26, 44, 86);
-/// Below the image tier, the background of the row of a component to add: dark green.
-const TO_ADD: r::Color = r::Color::Rgb(24, 70, 36);
-/// Below the image tier, the background of the row of a component to remove: dark red.
-const TO_REMOVE: r::Color = r::Color::Rgb(88, 28, 28);
+/// Below the image tier, the title's color of an added component: blue.
+const ADDED: r::Color = r::Color::Rgb(90, 150, 255);
+/// Below the image tier, the title's color of a component to add: green.
+const TO_ADD: r::Color = r::Color::Rgb(70, 200, 110);
+/// Below the image tier, the title's color of a component to remove: red.
+const TO_REMOVE: r::Color = r::Color::Rgb(235, 85, 85);
 /// The list's legend.
 pub(crate) const LEGEND_SELECT: &str = "<< [esc]     [w][a][s][d] [space]     [enter] >>";
 /// The legend of the preview and the finished run.
@@ -90,30 +90,25 @@ fn select(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
 }
 
 /// A component's card, a row in its border. In the image tier: its radio box, its icon, and its
-/// title over its summary. Below it, no box or icon: the row's background in its mark's color.
+/// title over its summary. Below it, no box or icon: the title in its mark's color, and the cursor's
+/// row between two horizontal bars.
 fn card(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons, i: usize, selected: bool) {
     let component = &app.catalog.components[i];
-    let shaded = area.inner(r::Margin::new(1, 1));
-    if app.tier != Tier::Image
-        && let Some(shade) = shade(app.marks[i])
-    {
-        frame.render_widget(r::Block::new().style(r::Style::new().bg(shade)), shaded);
+    let images = app.tier == Tier::Image;
+    if selected && images {
+        border(frame, area, app.tier, PURPLE, None, None);
+    } else if selected {
+        let bars = r::Block::new().borders(r::Borders::TOP | r::Borders::BOTTOM).border_style(r::Style::new().fg(PURPLE));
+        frame.render_widget(bars, area);
     }
-    if selected {
-        match app.tier {
-            Tier::Plain => {
-                for x in [area.left(), area.right().saturating_sub(1)] {
-                    let bar = r::Rect { x, width: area.width.min(1), ..shaded };
-                    frame.render_widget(r::Block::new().style(r::Style::new().bg(PURPLE)), bar);
-                }
-            }
-            _ => border(frame, area, app.tier, PURPLE, None, None),
-        }
+    let mut title = r::Style::new().add_modifier(r::Modifier::BOLD);
+    if !images && let Some(color) = shade(app.marks[i]) {
+        title = title.fg(color);
     }
     let inner = area.inner(r::Margin::new(INSET, 1));
     let indent = u16::try_from(component.depth).unwrap_or(u16::MAX).saturating_mul(INDENT).min(inner.width);
     let row = r::Rect { x: inner.x + indent, width: inner.width - indent, ..inner };
-    let lines_area = if let Some(radios) = icons.radios.as_ref().filter(|_| app.tier == Tier::Image) {
+    let lines_area = if let Some(radios) = icons.radios.as_ref().filter(|_| images) {
         let [radio_area, icon_area, lines_area] = r::Layout::horizontal([
             r::Constraint::Length(tui::icon::ICON_SIZE.width),
             r::Constraint::Length(tui::icon::ICON_SIZE.width),
@@ -130,12 +125,12 @@ fn card(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons, i: 
     lines(
         frame,
         lines_area,
-        r::Line::styled(component.title.as_str(), r::Style::new().add_modifier(r::Modifier::BOLD)),
+        r::Line::styled(component.title.as_str(), title),
         r::Line::styled(component.description.as_str(), r::Style::new().fg(r::Color::Gray)),
     );
 }
 
-/// The background a mark gives its row below the image tier.
+/// The color a mark gives its title below the image tier.
 fn shade(mark: Mark) -> Option<r::Color> {
     match mark {
         Mark::Absent => None,

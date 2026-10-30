@@ -21,7 +21,7 @@ pub(crate) mod r {
     pub(crate) use ratatui::layout::{Constraint, Flex, Layout, Margin, Rect, Size};
     pub(crate) use ratatui::style::{Color, Modifier, Style};
     pub(crate) use ratatui::text::{Line, Span, Text};
-    pub(crate) use ratatui::widgets::{Block, BorderType, Clear, Paragraph};
+    pub(crate) use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
     pub(crate) use ratatui_image::picker::{Capability, Picker, ProtocolType, cap_parser::QueryStdioOptions};
     pub(crate) use ratatui_image::protocol::Protocol;
     pub(crate) use ratatui_image::{Image, Resize};

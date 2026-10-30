@@ -25,12 +25,12 @@ enter goes on, and escape goes back or quits.
 The TUI draws in the tier of what the terminal does well. The image tier, for
 a terminal with a graphics protocol (kitty's, sixel, or iTerm2's), draws each
 component with a radio box and an icon, and rounded lines. Below it, a
-component's row takes the color of its state instead, dark blue added, dark
-green to add, dark red to remove: the lines tier, for a terminal known to draw
-its own line characters, frames the cursor's row with rounded lines; the plain
-tier, for any other, marks it with purple bars. `--tier image`, `--tier
-lines`, or `--tier plain` chooses; `stuff probe` prints what Stuff finds the
-terminal able to draw.
+component's title takes the color of its state instead, blue added, green to
+add, red to remove, and the cursor's row lies between two horizontal bars: the
+lines tier, for a terminal known to draw its own line characters, draws the
+dialog and the output in rounded lines; the plain tier, for any other, in
+none. `--tier image`, `--tier lines`, or `--tier plain` chooses; `stuff probe`
+prints what Stuff finds the terminal able to draw.
 
 The stuff directory
 --------------------------------------------------------------------------------

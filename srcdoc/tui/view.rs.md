@@ -27,12 +27,10 @@ still spanning the whole width.
 
 ## fn card, fn shade
 
-Below the image tier a card has no box or icon: the background of its two
-lines takes its mark's color, dark blue added, dark green to add, dark red to
-remove, and the blank rows between cards keep the colors apart. The cursor's
-card has its rounded border in the lines tier; in the plain tier, which draws
-no line character, purple bars at the row's ends, a cell's background filling
-the cell in every terminal.
+Below the image tier a card has no box or icon: its title takes its mark's
+color, blue added, green to add, red to remove, and the cursor's card lies
+between two purple horizontal bars, which come out whole in a terminal that
+breaks a vertical line between rows.
 
 ## fn image
 
