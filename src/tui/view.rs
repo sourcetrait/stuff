@@ -18,10 +18,11 @@ const CARD_ROWS: u16 = 4;
 const PADDING: u16 = 1;
 /// The columns from the screen's edge to a row's content: a card's border and its padding.
 const INSET: u16 = 1 + PADDING;
-/// The columns a subcomponent is indented by, a level.
-const INDENT: u16 = 4;
 /// The columns between a row's parts.
 const GAP: u16 = 1;
+/// The columns a subcomponent is indented by, a level: a radio box and its gap, so its radio box
+/// lines up under its parent's icon.
+pub(crate) const INDENT: u16 = tui::icon::ICON_SIZE.width + GAP;
 
 /// Draws the screen showing.
 pub(crate) fn draw(frame: &mut ratatui::Frame, app: &App, icons: &Icons) {

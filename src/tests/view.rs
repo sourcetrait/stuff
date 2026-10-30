@@ -42,5 +42,5 @@ fn a_subcomponent_is_indented_under_its_parent() {
     let buffer = render(&app, 80, 24);
     let (rust_x, _) = find(&buffer, "RUST").expect("rust's card");
     let (nightly_x, _) = find(&buffer, "RUST/NIGHTLY").expect("nightly's card");
-    assert_eq!(nightly_x, rust_x + 4);
+    assert_eq!(nightly_x, rust_x + tui::view::INDENT);
 }

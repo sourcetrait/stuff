@@ -19,9 +19,9 @@ so the header's icon lines up over the radio boxes.
 ## fn card
 
 The row divides into the radio box, the icon, and a column of the title over
-the summary, `GAP` apart. A subcomponent's parts are indented its depth times
-four columns inside the row, the border still spanning the whole width. The
-tests find the radio box from the title by those widths.
+the summary, `GAP` apart. A subcomponent's parts are indented a radio box and
+its gap a level, so its radio box lines up under its parent's icon, the border
+still spanning the whole width.
 
 ## fn radio
 
