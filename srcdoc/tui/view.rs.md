@@ -32,7 +32,9 @@ title, the border still spanning the whole width.
 ## fn shade
 
 In the simple look a card has no box: its title takes its mark's color,
-blue added, green to add, red to remove.
+blue added, green to add, red to remove, and an added component carries
+`[exists]` after its title, whatever its mark, so what is in the home reads
+plainly without a box to fill.
 
 ## fn image
 

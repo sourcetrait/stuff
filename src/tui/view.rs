@@ -89,16 +89,21 @@ fn select(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
 }
 
 /// A component's card, a row in its border. In the fancy look: its radio box, and its title over its
-/// summary. In the simple look, no box: the title in its mark's color.
+/// summary. In the simple look, no box: the title in its mark's color, `[exists]` after it where the
+/// component is added.
 fn card(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons, i: usize, selected: bool) {
     let component = &app.catalog.components[i];
     let images = app.look == Look::Fancy;
     if selected {
         border(frame, area, app.look, PURPLE, None);
     }
-    let mut title = r::Style::new().add_modifier(r::Modifier::BOLD);
-    if !images && let Some(color) = shade(app.marks[i]) {
-        title = title.fg(color);
+    let shade = shade(app.marks[i]).filter(|_| !images);
+    let mut title = r::Line::styled(
+        component.title.as_str(),
+        shade.map_or(r::Style::new(), |color| r::Style::new().fg(color)).add_modifier(r::Modifier::BOLD),
+    );
+    if !images && app.added[i] {
+        title.push_span(r::Span::styled(" [exists]", shade.map_or(r::Style::new(), |color| r::Style::new().fg(color))));
     }
     let inner = area.inner(r::Margin::new(INSET, 1));
     let indent = u16::try_from(component.depth).unwrap_or(u16::MAX).saturating_mul(INDENT).min(inner.width);
@@ -113,12 +118,7 @@ fn card(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons, i: 
     } else {
         row
     };
-    lines(
-        frame,
-        lines_area,
-        r::Line::styled(component.title.as_str(), title),
-        r::Line::styled(component.description.as_str(), r::Style::new().fg(r::Color::Gray)),
-    );
+    lines(frame, lines_area, title, r::Line::styled(component.description.as_str(), r::Style::new().fg(r::Color::Gray)));
 }
 
 /// The color a mark gives its title in the simple look.
