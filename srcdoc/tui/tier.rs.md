@@ -2,13 +2,14 @@
 
 ## fn detect
 
-Terminals differ in what they draw well, so the TUI draws in tiers. A graphics
-protocol, which the startup query finds, gives the image tier. No query finds
-whether a terminal draws its line characters itself, cell-exact, or from its
-font, which can leave gaps between the rows of a vertical line; a terminal
-known to draw its own, by a variable it sets or the name in `TERM` or
-`TERM_PROGRAM`, gives the lines tier, any other the plain tier. `--tier`
-overrides.
+Terminals differ in what they draw well, so the TUI draws in tiers, chosen by
+the graphics protocol the startup query finds, `--tier` overriding. kitty's
+protocol and iTerm2's place an image by cells, the terminal scaling it, so the
+image tier draws its radio boxes and icon there. A sixel is sized in pixels
+from the cell size the terminal reports, which has come out wrong, so a sixel
+terminal draws in the lines tier, without images. A terminal with no protocol
+draws in the plain tier, whose borders are horizontal bars alone, since some
+terminals break a vertical line between rows.
 
 ## fn probe
 

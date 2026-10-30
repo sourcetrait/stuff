@@ -23,15 +23,14 @@ In the TUI, `w` `a` `s` `d` move, space marks a component to add or remove,
 enter goes on, and escape goes back or quits.
 
 The TUI draws in the tier of what the terminal does well. The image tier, for
-a terminal with a graphics protocol (kitty's, sixel, or iTerm2's), draws each
-component with a radio box, the stuff directory's icon in the header, and
-rounded lines. Below it, a component's title takes the color of its state
-instead, blue added, green to add, red to remove, and the cursor's row lies
-between two horizontal bars: the lines tier, for a terminal known to draw its
-own line characters, draws the dialog and the output in rounded lines; the
-plain tier, for any other, in none. `--tier image`, `--tier lines`, or `--tier
-plain` chooses; `stuff probe` prints what Stuff finds the terminal able to
-draw.
+a terminal that scales images to its cells (kitty's protocol or iTerm2's),
+draws each component with a radio box, the stuff directory's icon in the
+header, and rounded borders. Below it, a component's title takes the color of
+its state instead, blue added, green to add, red to remove: the lines tier,
+for a terminal that takes sixels, keeps the rounded borders; the plain tier,
+for any other, draws bars above and below in their place. `--tier image`,
+`--tier lines`, or `--tier plain` chooses; `stuff probe` prints what Stuff
+finds the terminal able to draw.
 
 The stuff directory
 --------------------------------------------------------------------------------

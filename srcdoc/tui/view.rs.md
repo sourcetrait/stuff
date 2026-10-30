@@ -33,10 +33,8 @@ title, the border still spanning the whole width.
 
 ## fn card, fn shade
 
-Below the image tier a card has no box or icon: its title takes its mark's
-color, blue added, green to add, red to remove, and the cursor's card lies
-between two purple horizontal bars, which come out whole in a terminal that
-breaks a vertical line between rows.
+Below the image tier a card has no box: its title takes its mark's color,
+blue added, green to add, red to remove.
 
 ## fn image
 
@@ -47,8 +45,9 @@ graphics protocol.
 
 A terminal that draws box-drawing characters from its font, rather than
 filling their cells itself, can leave a gap between the rows of a vertical
-line. The image and lines tiers draw rounded lines; the plain tier draws no
-line character, tinting the dialog instead.
+line. The image and lines tiers draw rounded borders; the plain tier draws the
+top and bottom alone, bars above and below the cursor's card, the dialog, and
+the output.
 
 ## fn confirm
 

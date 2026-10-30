@@ -6,8 +6,6 @@ use crate::*;
 pub(crate) const PURPLE: r::Color = r::Color::Rgb(160, 100, 240);
 /// The color of the legend and other quiet text.
 pub(crate) const QUIET: r::Color = r::Color::DarkGray;
-/// The plain tier's stand-in for the dialog's purple border: a dark purple behind it.
-const TINT: r::Color = r::Color::Rgb(48, 32, 76);
 /// Below the image tier, the title's color of an added component: blue.
 const ADDED: r::Color = r::Color::Rgb(90, 150, 255);
 /// Below the image tier, the title's color of a component to add: green.
@@ -91,16 +89,12 @@ fn select(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
 }
 
 /// A component's card, a row in its border. In the image tier: its radio box, and its title over its
-/// summary. Below it, no box: the title in its mark's color, and the cursor's row between two
-/// horizontal bars.
+/// summary. Below it, no box: the title in its mark's color.
 fn card(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons, i: usize, selected: bool) {
     let component = &app.catalog.components[i];
     let images = app.tier == Tier::Image;
-    if selected && images {
-        border(frame, area, app.tier, PURPLE, None, None);
-    } else if selected {
-        let bars = r::Block::new().borders(r::Borders::TOP | r::Borders::BOTTOM).border_style(r::Style::new().fg(PURPLE));
-        frame.render_widget(bars, area);
+    if selected {
+        border(frame, area, app.tier, PURPLE, None);
     }
     let mut title = r::Style::new().add_modifier(r::Modifier::BOLD);
     if !images && let Some(color) = shade(app.marks[i]) {
@@ -151,28 +145,16 @@ fn image(frame: &mut ratatui::Frame, area: r::Rect, protocol: Option<&r::Protoco
     }
 }
 
-/// A border around an area, a title in its top: rounded lines where the terminal draws lines; in the
-/// plain tier, which draws none, the area tinted where a tint is given, the title on its top row.
-fn border(
-    frame: &mut ratatui::Frame,
-    area: r::Rect,
-    tier: Tier,
-    color: r::Color,
-    title: Option<&str>,
-    tint: Option<r::Color>,
-) {
-    if tier != Tier::Plain {
-        let block = r::Block::bordered().border_type(r::BorderType::Rounded).border_style(r::Style::new().fg(color));
-        frame.render_widget(if let Some(title) = title { block.title(title) } else { block }, area);
-        return;
+/// A border around an area, a title in its top: rounded lines in the image and lines tiers; in the
+/// plain tier, horizontal bars above and below, which come out whole where a terminal breaks a
+/// vertical line between rows.
+fn border(frame: &mut ratatui::Frame, area: r::Rect, tier: Tier, color: r::Color, title: Option<&str>) {
+    let block = match tier {
+        Tier::Plain => r::Block::new().borders(r::Borders::TOP | r::Borders::BOTTOM),
+        Tier::Image | Tier::Lines => r::Block::bordered().border_type(r::BorderType::Rounded),
     }
-    if let Some(tint) = tint {
-        frame.render_widget(r::Block::new().style(r::Style::new().bg(tint)), area);
-    }
-    if let Some(title) = title {
-        let place = r::Rect { x: area.x + 1, width: area.width.saturating_sub(2), height: area.height.min(1), ..area };
-        frame.render_widget(r::Line::styled(title, r::Style::new().fg(color).add_modifier(r::Modifier::BOLD)), place);
-    }
+    .border_style(r::Style::new().fg(color));
+    frame.render_widget(if let Some(title) = title { block.title(title) } else { block }, area);
 }
 
 /// The preview: each step, a green add or a red remove, in the order it runs.
@@ -206,7 +188,7 @@ fn confirm(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
         height,
     );
     frame.render_widget(r::Clear, popup);
-    border(frame, popup, app.tier, PURPLE, Some(" Proceed? "), Some(TINT));
+    border(frame, popup, app.tier, PURPLE, Some(" Proceed? "));
     let inner = popup.inner(r::Margin::new(1, 1));
     let [text_area, button_area] =
         r::Layout::vertical([r::Constraint::Min(1), r::Constraint::Length(1)]).areas(inner);
@@ -242,7 +224,7 @@ fn button(label: &str, focused: bool) -> r::Span<'static> {
 fn run(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
     let [output_area, status_area] =
         r::Layout::vertical([r::Constraint::Min(3), r::Constraint::Length(1)]).areas(area);
-    border(frame, output_area, app.tier, QUIET, Some(" output "), None);
+    border(frame, output_area, app.tier, QUIET, Some(" output "));
     let inner = output_area.inner(r::Margin::new(1, 1));
     frame.render_widget(r::Paragraph::new(app.output.tail(usize::from(inner.height))), inner);
     let status = if app.running {

@@ -21,11 +21,11 @@ pub(crate) enum Screen {
 /// What the terminal draws well, a tier of its capabilities.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub(crate) enum Tier {
-    /// Images through a graphics protocol, and rounded lines.
+    /// Images scaled to their cells, radio boxes among them, and rounded borders.
     Image,
-    /// Rounded lines the terminal draws itself, and colors.
+    /// Rounded borders, and colored titles for the marks.
     Lines,
-    /// Colors alone, no line characters.
+    /// Horizontal bars and rules, and colored titles for the marks.
     Plain,
 }
 
