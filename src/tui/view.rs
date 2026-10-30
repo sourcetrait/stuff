@@ -10,10 +10,18 @@ pub(crate) const QUIET: r::Color = r::Color::DarkGray;
 pub(crate) const LEGEND_SELECT: &str = "<< [esc]     [w][a][s][d] [space]     [enter] >>";
 /// The legend of the preview and the finished run.
 pub(crate) const LEGEND_STEP: &str = "<< [esc]     [enter] >>";
-/// The rows a card takes, its spacing included.
-const CARD_ROWS: u16 = 3;
+/// A card's rows: its two lines within its border's.
+const CARD_ROWS: u16 = 4;
+/// The columns between a card's border and its content.
+const PADDING: u16 = 1;
+/// The columns from the screen's edge to a row's content: a card's border and its padding.
+const INSET: u16 = 1 + PADDING;
 /// The columns a subcomponent is indented by, a level.
 const INDENT: u16 = 4;
+/// The radio box's columns, about square over a card's two lines.
+pub(crate) const RADIO_WIDTH: u16 = 4;
+/// The columns between a row's parts.
+pub(crate) const GAP: u16 = 1;
 
 /// Draws the screen showing.
 pub(crate) fn draw(frame: &mut ratatui::Frame, app: &App, icons: &Icons) {
@@ -36,19 +44,26 @@ pub(crate) fn draw(frame: &mut ratatui::Frame, app: &App, icons: &Icons) {
     legend(frame, foot, app);
 }
 
-/// The header: the configuration's icon, its title, and the directory.
+/// The header, a row: the configuration's icon, and its title over the directory.
 fn header(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
+    let [row, _] = r::Layout::vertical([r::Constraint::Length(2), r::Constraint::Fill(1)])
+        .areas(area.inner(r::Margin::new(INSET, 0)));
+    let [icon_area, lines_area] =
+        r::Layout::horizontal([r::Constraint::Length(tui::icon::ICON_SIZE.width), r::Constraint::Fill(1)])
+            .spacing(GAP)
+            .areas(row);
     if let Some(protocol) = &icons.header {
-        frame.render_widget(r::Image::new(protocol), clip(area.x + 1, area.y, 4, 2, area));
+        frame.render_widget(r::Image::new(protocol), icon_area);
     }
-    let text = vec![
-        r::Line::styled(app.catalog.config.title.clone(), r::Style::new().add_modifier(r::Modifier::BOLD)),
+    lines(
+        frame,
+        lines_area,
+        r::Line::styled(app.catalog.config.title.as_str(), r::Style::new().add_modifier(r::Modifier::BOLD)),
         r::Line::styled(app.catalog.dir.display().to_string(), r::Style::new().fg(QUIET)),
-    ];
-    frame.render_widget(r::Paragraph::new(text), clip(area.x + 7, area.y, area.width, 2, area));
+    );
 }
 
-/// The component list: a card a component, the cursor's in purple.
+/// The component list: a column of cards, the cursor's framed in purple.
 fn select(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
     if app.order.is_empty() {
         frame.render_widget(r::Paragraph::new(r::Line::styled("no components", r::Style::new().fg(QUIET))), area);
@@ -56,45 +71,76 @@ fn select(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
     }
     let visible = usize::from((area.height / CARD_ROWS).max(1));
     let start = (app.cursor + 1).saturating_sub(visible);
-    for (row, &i) in app.order.iter().enumerate().skip(start).take(visible) {
-        let y = area.y + u16::try_from(row - start).unwrap_or(0) * CARD_ROWS;
-        card(frame, clip(area.x, y, area.width, 2, area), app, icons, i, row == app.cursor);
+    let rows = r::Layout::vertical(vec![r::Constraint::Length(CARD_ROWS); visible])
+        .flex(r::Flex::Start)
+        .split(area);
+    for (&row_area, (row, &i)) in rows.iter().zip(app.order.iter().enumerate().skip(start)) {
+        card(frame, row_area, app, icons, i, row == app.cursor);
     }
 }
 
-/// A component's card: its radio box, its icon, its title, and its summary.
+/// A component's card, a row in its border: its radio box, its icon, and its title over its summary.
 fn card(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons, i: usize, selected: bool) {
     let component = &app.catalog.components[i];
+    let border = r::Block::bordered()
+        .border_type(r::BorderType::Rounded)
+        .border_style(r::Style::new().fg(PURPLE))
+        .padding(r::Padding::horizontal(PADDING));
+    let inner = border.inner(area);
     if selected {
-        let bar = r::Paragraph::new(vec![r::Line::raw("▌"), r::Line::raw("▌")]).style(r::Style::new().fg(PURPLE));
-        frame.render_widget(bar, clip(area.x, area.y, 1, 2, area));
+        frame.render_widget(border, area);
     }
-    let x = area.x + 2 + u16::try_from(component.depth).unwrap_or(0) * INDENT;
-    let (glyph, color) = match app.marks[i] {
-        Mark::Absent => ("○", r::Color::Gray),
-        Mark::Added => ("●", r::Color::Gray),
-        Mark::ToAdd => ("●", r::Color::Green),
-        Mark::ToRemove => ("●", r::Color::Red),
-    };
-    frame.render_widget(r::Paragraph::new(r::Line::styled(glyph, r::Style::new().fg(color))), clip(x, area.y, 1, 1, area));
+    let indent = u16::try_from(component.depth).unwrap_or(u16::MAX).saturating_mul(INDENT).min(inner.width);
+    let row = r::Rect { x: inner.x + indent, width: inner.width - indent, ..inner };
+    let [radio_area, icon_area, lines_area] = r::Layout::horizontal([
+        r::Constraint::Length(RADIO_WIDTH),
+        r::Constraint::Length(tui::icon::ICON_SIZE.width),
+        r::Constraint::Fill(1),
+    ])
+    .spacing(GAP)
+    .areas(row);
+    radio(frame, radio_area, app.marks[i]);
     if let Some(Some(protocol)) = icons.components.get(i) {
-        frame.render_widget(r::Image::new(protocol), clip(x + 2, area.y, 4, 2, area));
+        frame.render_widget(r::Image::new(protocol), icon_area);
     }
-    let title_style = if selected {
-        r::Style::new().fg(PURPLE).add_modifier(r::Modifier::BOLD)
-    } else {
-        r::Style::new().add_modifier(r::Modifier::BOLD)
+    lines(
+        frame,
+        lines_area,
+        r::Line::styled(component.title.as_str(), r::Style::new().add_modifier(r::Modifier::BOLD)),
+        r::Line::styled(component.description.as_str(), r::Style::new().fg(r::Color::Gray)),
+    );
+}
+
+/// A row's two lines, one over the other.
+fn lines(frame: &mut ratatui::Frame, area: r::Rect, top: r::Line, bottom: r::Line) {
+    let [top_area, bottom_area] = r::Layout::vertical([r::Constraint::Length(1); 2]).areas(area);
+    frame.render_widget(top, top_area);
+    frame.render_widget(bottom, bottom_area);
+}
+
+/// The radio box, a card's two lines tall: an outline on its cells' edges when absent, filled in its mark's color otherwise.
+fn radio(frame: &mut ratatui::Frame, area: r::Rect, mark: Mark) {
+    let fill = match mark {
+        Mark::Absent => {
+            let edge = usize::from(area.width.saturating_sub(2));
+            let style = r::Style::new().fg(r::Color::Gray);
+            let outline = vec![
+                r::Line::styled(format!("🭽{}🭾", "▔".repeat(edge)), style),
+                r::Line::styled(format!("🭼{}🭿", "▁".repeat(edge)), style),
+            ];
+            frame.render_widget(r::Paragraph::new(outline), area);
+            return;
+        }
+        Mark::Added => r::Color::Gray,
+        Mark::ToAdd => r::Color::Green,
+        Mark::ToRemove => r::Color::Red,
     };
-    let text = vec![
-        r::Line::styled(component.title.clone(), title_style),
-        r::Line::styled(component.description.clone(), r::Style::new().fg(r::Color::Gray)),
-    ];
-    frame.render_widget(r::Paragraph::new(text), clip(x + 7, area.y, area.width, 2, area));
+    frame.render_widget(r::Block::new().style(r::Style::new().bg(fill)), area);
 }
 
 /// The preview: each step, a green add or a red remove, in the order it runs.
 fn preview(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
-    let lines: Vec<r::Line> = app
+    let steps: Vec<r::Line> = app
         .plan
         .steps
         .iter()
@@ -109,7 +155,7 @@ fn preview(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
             ])
         })
         .collect();
-    frame.render_widget(r::Paragraph::new(lines), clip(area.x + 2, area.y, area.width, area.height, area));
+    frame.render_widget(r::Paragraph::new(steps), area.inner(r::Margin::new(INSET, 0)));
 }
 
 /// The proceed dialog, centered over the screen, its focused button purple.

@@ -262,8 +262,8 @@ impl App {
 /// Runs the TUI until the user leaves it.
 pub(crate) fn run(catalog: Catalog, runner: Runner, added: Vec<bool>) -> Result<ExitCode> {
     let mut terminal = ratatui::init();
-    let picker = r::Picker::from_query_stdio().unwrap_or_else(|_| r::Picker::halfblocks());
-    let icons = Icons::load(&catalog, &picker);
+    let picker = tui::icon::picker();
+    let icons = Icons::load(&catalog, &picker, tui::icon::background(&picker));
     let outcome = drive(&mut terminal, App::new(catalog, added), &runner, &icons);
     ratatui::restore();
     outcome

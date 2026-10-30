@@ -17,7 +17,11 @@ used by the unit tests alone; in the main hub they warn as unused imports.
 
 ## Dependencies
 
-ratatui-image's default features pull chafa through pkg-config, which fails
-the build without the C library installed; only its `crossterm` feature is
-taken. `image` is declared with the `png` feature alone, matching the
-instance ratatui-image builds against.
+ratatui-image takes its `crossterm` and `chafa-dyn` features, its defaults left
+off for the `image` formats they would add. Where the terminal speaks no image
+protocol, its halfblocks protocol draws an icon through chafa, which picks
+among blocks, braille, and other symbols for a richer picture than half blocks
+alone. `chafa-dyn` finds chafa 1.8.0 or newer through pkg-config and links it
+dynamically: a build needs chafa's development files, Fedora's `chafa-devel`,
+and a run its library, `chafa-libs`. `image` is declared with the `png`
+feature alone, matching the instance ratatui-image builds against.

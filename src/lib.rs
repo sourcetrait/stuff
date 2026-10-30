@@ -16,11 +16,11 @@ pub(crate) mod tui {
 
 pub(crate) mod r {
     pub(crate) use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
-    pub(crate) use ratatui::layout::{Constraint, Layout, Rect, Size};
+    pub(crate) use ratatui::layout::{Constraint, Flex, Layout, Margin, Rect, Size};
     pub(crate) use ratatui::style::{Color, Modifier, Style};
     pub(crate) use ratatui::text::{Line, Span, Text};
-    pub(crate) use ratatui::widgets::{Block, BorderType, Clear, Paragraph};
-    pub(crate) use ratatui_image::picker::Picker;
+    pub(crate) use ratatui::widgets::{Block, BorderType, Clear, Padding, Paragraph};
+    pub(crate) use ratatui_image::picker::{Capability, Picker, cap_parser::QueryStdioOptions};
     pub(crate) use ratatui_image::protocol::Protocol;
     pub(crate) use ratatui_image::{Image, Resize};
 }

@@ -3,10 +3,13 @@ use crate::*;
 use super::catalog::catalog;
 
 fn render(app: &App, width: u16, height: u16) -> ratatui::buffer::Buffer {
+    render_with(app, &Icons::none(app.catalog.components.len()), width, height)
+}
+
+fn render_with(app: &App, icons: &Icons, width: u16, height: u16) -> ratatui::buffer::Buffer {
     let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(width, height))
         .expect("a test terminal");
-    let icons = Icons::none(app.catalog.components.len());
-    terminal.draw(|frame| tui::view::draw(frame, app, &icons)).expect("a frame");
+    terminal.draw(|frame| tui::view::draw(frame, app, icons)).expect("a frame");
     terminal.backend().buffer().clone()
 }
 
@@ -23,6 +26,12 @@ fn find(buffer: &ratatui::buffer::Buffer, text: &str) -> Option<(u16, u16)> {
             (u16::try_from(x).unwrap_or(0), u16::try_from(y).unwrap_or(0))
         })
     })
+}
+
+/// A card's radio box, its top-left cell, found from the card's title.
+fn radio(buffer: &ratatui::buffer::Buffer, title: &str) -> (u16, u16) {
+    let (x, y) = find(buffer, title).expect("a card");
+    (x - tui::view::RADIO_WIDTH - tui::icon::ICON_SIZE.width - 2 * tui::view::GAP, y)
 }
 
 #[test]
@@ -46,18 +55,56 @@ fn a_subcomponent_is_indented_under_its_parent() {
 }
 
 #[test]
-fn the_radio_box_shows_the_mark_in_its_color() {
+fn the_radio_box_is_filled_in_its_mark_color() {
     let mut app = App::new(catalog(), vec![false, true, false, false, false]);
-    let i = app.order.iter().position(|&o| o == 0).expect("git listed");
-    app.cursor = i;
+    app.cursor = app.order.iter().position(|&o| o == 0).expect("git listed");
     app.toggle();
     let buffer = render(&app, 80, 24);
-    let (title_x, title_y) = find(&buffer, "GIT").expect("git's card");
-    let radio = &buffer[(title_x - 7, title_y)];
-    assert_eq!((radio.symbol(), radio.fg), ("●", r::Color::Green));
-    let (rust_x, rust_y) = find(&buffer, "RUST").expect("rust's card");
-    let added = &buffer[(rust_x - 7, rust_y)];
-    assert_eq!((added.symbol(), added.fg), ("●", r::Color::Gray));
+    let (x, y) = radio(&buffer, "GIT");
+    assert_eq!(buffer[(x, y)].bg, r::Color::Green);
+    let lower = &buffer[(x + tui::view::RADIO_WIDTH - 1, y + 1)];
+    assert_eq!(lower.bg, r::Color::Green, "the box fills both of the card's lines");
+    let (x, y) = radio(&buffer, "RUST");
+    assert_eq!(buffer[(x, y)].bg, r::Color::Gray);
+}
+
+#[test]
+fn an_absent_component_shows_an_empty_box() {
+    let app = App::new(catalog(), vec![false; 5]);
+    let buffer = render(&app, 80, 24);
+    let (x, y) = radio(&buffer, "ZED");
+    let top_left = &buffer[(x, y)];
+    let bottom_right = &buffer[(x + tui::view::RADIO_WIDTH - 1, y + 1)];
+    assert_eq!((top_left.symbol(), top_left.fg), ("🭽", r::Color::Gray));
+    assert_eq!(bottom_right.symbol(), "🭿", "the outline spans both of the card's lines");
+}
+
+#[test]
+fn the_icon_sits_between_the_radio_box_and_the_lines() {
+    let app = App::new(catalog(), vec![false; 5]);
+    let icons = Icons::load(&app.catalog, &r::Picker::halfblocks(), None);
+    let buffer = render_with(&app, &icons, 80, 24);
+    let (x, y) = radio(&buffer, "GIT");
+    let left = x + tui::view::RADIO_WIDTH + tui::view::GAP;
+    let drawn = (left..left + tui::icon::ICON_SIZE.width)
+        .flat_map(|x| [(x, y), (x, y + 1)])
+        .any(|cell| buffer[cell].symbol() != " " || buffer[cell].bg != r::Color::Reset);
+    assert!(drawn, "the icon's cells hold its picture");
+}
+
+#[test]
+fn the_cursor_frames_its_whole_row_in_purple() {
+    let mut app = App::new(catalog(), vec![false; 5]);
+    app.cursor = 1;
+    let buffer = render(&app, 80, 24);
+    let (_, y) = find(&buffer, "RUST").expect("rust's card");
+    let top_left = &buffer[(0, y - 1)];
+    let bottom_right = &buffer[(79, y + 2)];
+    assert_eq!((top_left.symbol(), top_left.fg), ("╭", tui::view::PURPLE));
+    assert_eq!((bottom_right.symbol(), bottom_right.fg), ("╯", tui::view::PURPLE));
+    assert_eq!((buffer[(0, y)].symbol(), buffer[(0, y + 1)].symbol()), ("│", "│"), "the border runs both lines");
+    let (_, git_y) = find(&buffer, "GIT").expect("git's card");
+    assert_eq!(buffer[(0, git_y)].symbol(), " ", "the other rows have no border");
 }
 
 #[test]
