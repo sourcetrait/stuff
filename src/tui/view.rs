@@ -6,11 +6,11 @@ use crate::*;
 pub(crate) const PURPLE: r::Color = r::Color::Rgb(160, 100, 240);
 /// The color of the legend and other quiet text.
 pub(crate) const QUIET: r::Color = r::Color::DarkGray;
-/// Below the image tier, the title's color of an added component: blue.
+/// In the simple look, the title's color of an added component: blue.
 const ADDED: r::Color = r::Color::Rgb(90, 150, 255);
-/// Below the image tier, the title's color of a component to add: green.
+/// In the simple look, the title's color of a component to add: green.
 const TO_ADD: r::Color = r::Color::Rgb(70, 200, 110);
-/// Below the image tier, the title's color of a component to remove: red.
+/// In the simple look, the title's color of a component to remove: red.
 const TO_REMOVE: r::Color = r::Color::Rgb(235, 85, 85);
 /// The list's legend.
 pub(crate) const LEGEND_SELECT: &str = "<< [esc]     [w][a][s][d] [space]     [enter] >>";
@@ -49,11 +49,11 @@ pub(crate) fn draw(frame: &mut ratatui::Frame, app: &App, icons: &Icons) {
     legend(frame, foot, app);
 }
 
-/// The header, a row: the configuration's icon in the image tier, and its title over the directory.
+/// The header, a row: the configuration's icon in the fancy look, and its title over the directory.
 fn header(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
     let [row, _] = r::Layout::vertical([r::Constraint::Length(2), r::Constraint::Fill(1)])
         .areas(area.inner(r::Margin::new(INSET, 0)));
-    let lines_area = if app.tier == Tier::Image {
+    let lines_area = if app.look == Look::Fancy {
         let [icon_area, lines_area] =
             r::Layout::horizontal([r::Constraint::Length(tui::icon::ICON_SIZE.width), r::Constraint::Fill(1)])
                 .spacing(GAP)
@@ -77,8 +77,8 @@ fn select(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
         frame.render_widget(r::Paragraph::new(r::Line::styled("no components", r::Style::new().fg(QUIET))), area);
         return;
     }
-    // Below the image tier neighbouring cards share a border row, which holds a bar only for the cursor's.
-    let stride = if app.tier == Tier::Image { CARD_ROWS } else { CARD_ROWS - 1 };
+    // In the simple look neighbouring cards share a border row, which holds a bar only for the cursor's.
+    let stride = if app.look == Look::Fancy { CARD_ROWS } else { CARD_ROWS - 1 };
     let visible = usize::from((area.height.saturating_sub(CARD_ROWS - stride) / stride).max(1));
     let start = (app.cursor + 1).saturating_sub(visible);
     for (row, &i) in app.order.iter().enumerate().skip(start).take(visible) {
@@ -88,13 +88,13 @@ fn select(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
     }
 }
 
-/// A component's card, a row in its border. In the image tier: its radio box, and its title over its
-/// summary. Below it, no box: the title in its mark's color.
+/// A component's card, a row in its border. In the fancy look: its radio box, and its title over its
+/// summary. In the simple look, no box: the title in its mark's color.
 fn card(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons, i: usize, selected: bool) {
     let component = &app.catalog.components[i];
-    let images = app.tier == Tier::Image;
+    let images = app.look == Look::Fancy;
     if selected {
-        border(frame, area, app.tier, PURPLE, None);
+        border(frame, area, app.look, PURPLE, None);
     }
     let mut title = r::Style::new().add_modifier(r::Modifier::BOLD);
     if !images && let Some(color) = shade(app.marks[i]) {
@@ -121,7 +121,7 @@ fn card(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons, i: 
     );
 }
 
-/// The color a mark gives its title below the image tier.
+/// The color a mark gives its title in the simple look.
 fn shade(mark: Mark) -> Option<r::Color> {
     match mark {
         Mark::Absent => None,
@@ -145,13 +145,13 @@ fn image(frame: &mut ratatui::Frame, area: r::Rect, protocol: Option<&r::Protoco
     }
 }
 
-/// A border around an area, a title in its top: rounded lines in the image and lines tiers; in the
-/// plain tier, horizontal bars above and below, which come out whole where a terminal breaks a
-/// vertical line between rows.
-fn border(frame: &mut ratatui::Frame, area: r::Rect, tier: Tier, color: r::Color, title: Option<&str>) {
-    let block = match tier {
-        Tier::Plain => r::Block::new().borders(r::Borders::TOP | r::Borders::BOTTOM),
-        Tier::Image | Tier::Lines => r::Block::bordered().border_type(r::BorderType::Rounded),
+/// A border around an area, a title in its top: rounded lines in the fancy look; in the simple look,
+/// horizontal bars above and below, which come out whole where a terminal breaks a vertical line
+/// between rows.
+fn border(frame: &mut ratatui::Frame, area: r::Rect, look: Look, color: r::Color, title: Option<&str>) {
+    let block = match look {
+        Look::Simple => r::Block::new().borders(r::Borders::TOP | r::Borders::BOTTOM),
+        Look::Fancy => r::Block::bordered().border_type(r::BorderType::Rounded),
     }
     .border_style(r::Style::new().fg(color));
     frame.render_widget(if let Some(title) = title { block.title(title) } else { block }, area);
@@ -188,7 +188,7 @@ fn confirm(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
         height,
     );
     frame.render_widget(r::Clear, popup);
-    border(frame, popup, app.tier, PURPLE, Some(" Proceed? "));
+    border(frame, popup, app.look, PURPLE, Some(" Proceed? "));
     let inner = popup.inner(r::Margin::new(1, 1));
     let [text_area, button_area] =
         r::Layout::vertical([r::Constraint::Min(1), r::Constraint::Length(1)]).areas(inner);
@@ -224,7 +224,7 @@ fn button(label: &str, focused: bool) -> r::Span<'static> {
 fn run(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
     let [output_area, status_area] =
         r::Layout::vertical([r::Constraint::Min(3), r::Constraint::Length(1)]).areas(area);
-    border(frame, output_area, app.tier, QUIET, Some(" output "));
+    border(frame, output_area, app.look, QUIET, Some(" output "));
     let inner = output_area.inner(r::Margin::new(1, 1));
     frame.render_widget(r::Paragraph::new(app.output.tail(usize::from(inner.height))), inner);
     let status = if app.running {

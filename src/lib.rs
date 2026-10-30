@@ -11,8 +11,8 @@ pub(crate) mod tui {
     pub(crate) mod app;
     pub(crate) mod frame;
     pub(crate) mod icon;
+    pub(crate) mod look;
     pub(crate) mod output;
-    pub(crate) mod tier;
     pub(crate) mod view;
 }
 
@@ -38,7 +38,7 @@ pub(crate) use crate::{
     plan::{Plan, Step, StepAction},
     runner::{RunEvent, Runner, Script},
     tui::{
-        app::{App, Button, Mark, Screen, Tier},
+        app::{App, Button, Look, Mark, Screen},
         icon::Icons,
         output::Output,
     },

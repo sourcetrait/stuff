@@ -18,13 +18,13 @@ pub fn run() -> ExitCode {
 fn dispatch(cli: Cli) -> Result<ExitCode> {
     let (dir, action) = match cli.command {
         CliCommand::In { dir, action } => (dir, action),
-        CliCommand::Probe => return tui::tier::probe(),
+        CliCommand::Probe => return tui::look::probe(),
     };
     let catalog = Catalog::load(&dir)?;
     let runner = Runner::new(&catalog.dir);
     let added = runner.exists_all(&catalog)?;
     let Some(action) = action else {
-        return tui::app::run(catalog, runner, added, cli.tier);
+        return tui::app::run(catalog, runner, added, cli.look);
     };
     let kind = action.kind();
     if action.components().is_empty() {

@@ -18,15 +18,13 @@ pub(crate) enum Screen {
     Run,
 }
 
-/// What the terminal draws well, a tier of its capabilities.
+/// How the TUI looks: fancy where the terminal scales images to its cells, simple anywhere else.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
-pub(crate) enum Tier {
-    /// Images scaled to their cells, radio boxes among them, and rounded borders.
-    Image,
-    /// Rounded borders, and colored titles for the marks.
-    Lines,
-    /// Horizontal bars and rules, and colored titles for the marks.
-    Plain,
+pub(crate) enum Look {
+    /// Radio boxes and the header's icon as images, and rounded borders.
+    Fancy,
+    /// Colored titles for the marks, and horizontal bars and rules.
+    Simple,
 }
 
 /// Which dialog button has the focus.
@@ -93,8 +91,8 @@ pub(crate) struct App {
     pub(crate) running: bool,
     /// The run's failure, when it failed.
     pub(crate) failure: Option<String>,
-    /// What the terminal draws well.
-    pub(crate) tier: Tier,
+    /// How the TUI looks.
+    pub(crate) look: Look,
 }
 
 impl App {
@@ -116,7 +114,7 @@ impl App {
             step: None,
             running: false,
             failure: None,
-            tier: Tier::Lines,
+            look: Look::Simple,
         };
         app.remark();
         app
@@ -273,14 +271,14 @@ impl App {
     }
 }
 
-/// Runs the TUI until the user leaves it, in the tier given or the one the terminal is found in.
-pub(crate) fn run(catalog: Catalog, runner: Runner, added: Vec<bool>, tier: Option<Tier>) -> Result<ExitCode> {
+/// Runs the TUI until the user leaves it, in the look given or the one the terminal gets.
+pub(crate) fn run(catalog: Catalog, runner: Runner, added: Vec<bool>, look: Option<Look>) -> Result<ExitCode> {
     let mut terminal = ratatui::init();
     let picker = tui::icon::picker();
-    let tier = tier.unwrap_or_else(|| tui::tier::detect(&picker));
-    let icons = Icons::load(&catalog, &picker, tui::icon::background(&picker), tier);
+    let look = look.unwrap_or_else(|| tui::look::detect(&picker));
+    let icons = Icons::load(&catalog, &picker, tui::icon::background(&picker), look);
     let mut app = App::new(catalog, added);
-    app.tier = tier;
+    app.look = look;
     let outcome = drive(&mut terminal, app, &runner, &icons);
     ratatui::restore();
     outcome

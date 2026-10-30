@@ -1,15 +1,13 @@
-//! The terminal's tier of capabilities, and the probe that reports what Stuff finds.
+//! The look the terminal gets, and the probe that reports what Stuff finds.
 
 use crate::*;
 
-/// The tier the terminal falls in, by the graphics protocol the startup query finds: images where
-/// the terminal scales an image to its cells, lines where it takes a sixel, sized in pixels, plain
-/// where it draws no images.
-pub(crate) fn detect(picker: &r::Picker) -> Tier {
+/// The look the terminal gets, by the graphics protocol the startup query finds: fancy where the
+/// terminal scales an image to its cells, simple anywhere else.
+pub(crate) fn detect(picker: &r::Picker) -> Look {
     match picker.protocol_type() {
-        r::ProtocolType::Kitty | r::ProtocolType::Iterm2 => Tier::Image,
-        r::ProtocolType::Sixel => Tier::Lines,
-        r::ProtocolType::Halfblocks => Tier::Plain,
+        r::ProtocolType::Kitty | r::ProtocolType::Iterm2 => Look::Fancy,
+        r::ProtocolType::Sixel | r::ProtocolType::Halfblocks => Look::Simple,
     }
 }
 
@@ -20,7 +18,7 @@ pub(crate) fn probe() -> Result<ExitCode> {
     let window = ratatui::crossterm::terminal::window_size().ok();
     let var = |name: &str| std::env::var(name).unwrap_or_else(|_| "unset".to_string());
     let findings = [
-        ("tier", format!("{:?}", detect(&picker)).to_lowercase()),
+        ("look", format!("{:?}", detect(&picker)).to_lowercase()),
         ("protocol", format!("{:?}", picker.protocol_type()).to_lowercase()),
         ("cell", format!("{}x{} px, from the terminal's answer", font.width, font.height)),
         (

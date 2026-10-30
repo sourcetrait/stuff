@@ -18,8 +18,8 @@ Each mark's radio box is made once, at load, and shared by every card.
 
 ## fn Icons::load
 
-Images in the image tier alone, so a tier given on the command line draws the
-same everywhere; below it the TUI draws none. The one icon is the stuff
+Images in the fancy look alone, so a look given on the command line draws the
+same everywhere; the simple look draws none. The one icon is the stuff
 directory's, in the header. A sixel, whose transparency is all or nothing, is
 flattened onto the terminal's background where the terminal reports one; an
 image for the kitty protocol keeps its alpha, since a terminal's reported

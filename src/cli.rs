@@ -6,9 +6,9 @@ use crate::*;
 #[derive(Debug, clap::Parser)]
 #[command(name = "stuff", version, about)]
 pub(crate) struct Cli {
-    /// What the TUI draws with: image, lines, or plain; by default what the terminal is found to draw well.
+    /// How the TUI looks: fancy or simple; by default fancy where the terminal scales images to its cells.
     #[arg(long, global = true, value_enum)]
-    pub(crate) tier: Option<Tier>,
+    pub(crate) look: Option<Look>,
     /// What to do.
     #[command(subcommand)]
     pub(crate) command: CliCommand,
@@ -25,7 +25,7 @@ pub(crate) enum CliCommand {
         #[command(subcommand)]
         action: Option<CliAction>,
     },
-    /// Reports what the terminal can draw: its tier, graphics protocol, and cell size.
+    /// Reports what the terminal can draw: its look, graphics protocol, and cell size.
     Probe,
 }
 

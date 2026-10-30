@@ -38,7 +38,7 @@ impl Radios {
     }
 }
 
-/// The images ready to draw: the header's icon and the radio boxes; none below the image tier.
+/// The images ready to draw: the header's icon and the radio boxes; none in the simple look.
 pub(crate) struct Icons {
     /// The header's icon.
     pub(crate) header: Option<r::Protocol>,
@@ -53,15 +53,15 @@ struct Images<'a> {
 }
 
 impl Icons {
-    /// No images, for a terminal below the image tier and for a test.
+    /// No images, for the simple look and for a test.
     pub(crate) fn none() -> Self {
         Self { header: None, radios: None }
     }
 
-    /// The header's icon and the radio boxes as images in the image tier, where the picker found a
+    /// The header's icon and the radio boxes as images in the fancy look, where the picker found a
     /// graphics protocol; none below it.
-    pub(crate) fn load(catalog: &Catalog, picker: &r::Picker, background: Option<image::Rgba<u8>>, tier: Tier) -> Self {
-        if tier != Tier::Image || !graphics(picker) {
+    pub(crate) fn load(catalog: &Catalog, picker: &r::Picker, background: Option<image::Rgba<u8>>, look: Look) -> Self {
+        if look != Look::Fancy || !graphics(picker) {
             return Self::none();
         }
         let sixel = matches!(picker.protocol_type(), r::ProtocolType::Sixel);

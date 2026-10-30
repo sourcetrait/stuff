@@ -1,9 +1,9 @@
 # app.rs
 
-## enum Tier
+## enum Look
 
-Terminals draw images and lines with different success, so the TUI draws in
-tiers of what they can do, the same row structure in each (tier.rs).
+Terminals draw images and lines with different success, so the TUI has two
+looks, fancy and simple, the same row structure in each (look.rs).
 
 ## struct App
 
@@ -31,6 +31,6 @@ cursor stays on the component it was on.
 
 ## fn run
 
-The terminal is entered before the picker queries it, and the tier is settled
-before the icons load, since it decides how they are drawn. ratatui's `init`
-installs the panic hook that restores the terminal.
+The terminal is entered before the picker queries it, and the look is settled
+before the icons load, since it decides whether they are drawn. ratatui's
+`init` installs the panic hook that restores the terminal.

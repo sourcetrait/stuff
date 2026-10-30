@@ -13,9 +13,9 @@ and moves nothing.
 
 ## fn select
 
-In the image tier each card keeps its four rows. Below it neighbouring cards
-share a border row, three rows a card, since only the cursor's card draws its
-bars there.
+In the fancy look each card keeps its four rows. In the simple look
+neighbouring cards share a border row, three rows a card, since only the
+cursor's card draws its bars there.
 
 ## const INSET
 
@@ -24,16 +24,14 @@ so the header's icon lines up over the radio boxes.
 
 ## fn card
 
-In the image tier the row divides into the radio box and a column of the
+In the fancy look the row divides into the radio box and a column of the
 title over the summary, `GAP` apart. A subcomponent's parts are indented a
 radio box and its gap a level, so its radio box lines up under its parent's
 title, the border still spanning the whole width.
 
-## fn radio
+## fn shade
 
-## fn card, fn shade
-
-Below the image tier a card has no box: its title takes its mark's color,
+In the simple look a card has no box: its title takes its mark's color,
 blue added, green to add, red to remove.
 
 ## fn image
@@ -45,9 +43,9 @@ graphics protocol.
 
 A terminal that draws box-drawing characters from its font, rather than
 filling their cells itself, can leave a gap between the rows of a vertical
-line. The image and lines tiers draw rounded borders; the plain tier draws the
-top and bottom alone, bars above and below the cursor's card, the dialog, and
-the output.
+line. The fancy look draws rounded borders; the simple look draws the top and
+bottom alone, bars above and below the cursor's card, the dialog, and the
+output.
 
 ## fn confirm
 

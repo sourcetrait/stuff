@@ -2,8 +2,8 @@
 
 ## struct Cli
 
-`--tier` is global, so it may come anywhere on the line, and it overrides the
-tier the terminal is found in.
+`--look` is global, so it may come anywhere on the line, and it overrides the
+look the terminal gets.
 
 ## enum CliCommand
 

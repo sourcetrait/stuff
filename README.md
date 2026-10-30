@@ -22,15 +22,13 @@ stuff probe                            what the terminal can draw
 In the TUI, `w` `a` `s` `d` move, space marks a component to add or remove,
 enter goes on, and escape goes back or quits.
 
-The TUI draws in the tier of what the terminal does well. The image tier, for
-a terminal that scales images to its cells (kitty's protocol or iTerm2's),
-draws each component with a radio box, the stuff directory's icon in the
-header, and rounded borders. Below it, a component's title takes the color of
-its state instead, blue added, green to add, red to remove: the lines tier,
-for a terminal that takes sixels, keeps the rounded borders; the plain tier,
-for any other, draws bars above and below in their place. `--tier image`,
-`--tier lines`, or `--tier plain` chooses; `stuff probe` prints what Stuff
-finds the terminal able to draw.
+The TUI has two looks. The fancy look, for a terminal that scales images to
+its cells (kitty's protocol or iTerm2's), draws each component with a radio
+box, the stuff directory's icon in the header, and rounded borders. The simple
+look, for any other, colors a component's title by its state instead, blue
+added, green to add, red to remove, and draws bars above and below where the
+fancy look draws borders. `--look fancy` or `--look simple` chooses; `stuff
+probe` prints what Stuff finds the terminal able to draw.
 
 The stuff directory
 --------------------------------------------------------------------------------
@@ -53,7 +51,7 @@ it needs. A component's `config.toml` may hold keys of its own for its
 scripts to read.
 
 The stuff directory's `logo.png`, else the sourcetrait logo, heads the TUI in
-the image tier.
+the fancy look.
 
 Each script is a `def main` with no arguments, run by nu from its component's
 directory with your own nushell `env.nu` and `config.nu`, and with
