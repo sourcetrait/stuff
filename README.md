@@ -9,15 +9,23 @@ Usage
 --------------------------------------------------------------------------------
 
 ```
-stuff <dir>                         the TUI
-stuff <dir> add                     lists the components not added
-stuff <dir> remove                  lists the components added
-stuff <dir> add <components>...     adds them, with what they depend on
-stuff <dir> remove <components>...  removes them, with what depends on them
+stuff in <dir>                         the TUI
+stuff in <dir> add                     lists the components not added
+stuff in <dir> remove                  lists the components added
+stuff in <dir> add <components>...     adds them, with what they depend on
+stuff in <dir> remove <components>...  removes them, with what depends on them
 ```
+
+`in` names the source: the components in a stuff directory.
 
 In the TUI, `w` `a` `s` `d` move, space marks a component to add or remove,
 enter goes on, and escape goes back or quits.
+
+The TUI has two looks. Pretty draws rounded lines, and images through the
+terminal's graphics protocol; ugly draws in braille dots, which come out whole
+in a terminal that leaves gaps between the rows of its line characters. A
+terminal with a graphics protocol gets pretty, any other ugly; `--look pretty`
+or `--look ugly` chooses.
 
 The stuff directory
 --------------------------------------------------------------------------------
@@ -26,9 +34,11 @@ The stuff directory
 <dir>/
   config.toml           title = "..."
   logo.png
+  logo.bmp
   component/<component>/
     config.toml         title, description (80 characters at most), depends
     logo.png
+    logo.bmp
     exists.nu           exits 0 when the component is added, 1 when not
     add.nu              adds it
     remove.nu           removes it
@@ -40,8 +50,14 @@ subcomponent depends on its parent, and `depends` names any other components
 it needs. A component's `config.toml` may hold keys of its own for its
 scripts to read.
 
-Icons are 100x100 PNGs with transparency. A terminal with a graphics protocol
-(kitty's, sixel, or iTerm2's) shows them as images, any other as half-blocks.
+An icon comes as `logo.png`, an image with transparency, and as `logo.bmp`, a
+bitmap drawn in braille: each pixel a dot in its own color, black and
+transparent pixels empty, a cell holding two dots across and four down. A
+terminal with a graphics protocol (kitty's, sixel, or iTerm2's) shows the
+png; otherwise, or without a png, the bmp is drawn; without either, the
+default in the form the terminal can show. A component's icon sits in a
+rounded frame, its bmp six pixels square inside it; the directory's icon,
+unframed in the header, is eight pixels square.
 
 Each script is a `def main` with no arguments, run by nu from its component's
 directory with your own nushell `env.nu` and `config.nu`, and with

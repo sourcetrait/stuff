@@ -25,12 +25,18 @@ tests find the radio box from the title by those widths.
 
 ## fn radio
 
-The box is the card's two lines tall and four columns wide, about square in a
-typical font. An absent component's is an outline of one-eighth blocks, its
-corners from Symbols for Legacy Computing: they sit on the cells' outer edges,
-so the outline is as large as a filled box, where box-drawing lines run through
-the cells' middles and would draw it half the size. A marked one is filled in
-its mark's color.
+## fn icon
+
+An icon and a radio box draw the same way, an image through the graphics
+protocol or a bitmap in braille.
+
+## fn border, fn dots
+
+A terminal that draws box-drawing characters from its font, rather than
+filling their cells itself, can leave a gap between the rows of a vertical
+line. Pretty draws rounded lines; ugly draws a rounded frame of braille dots,
+whose spacing hides those gaps, its top edge along the bottom of the first
+row and its bottom edge along the top of the last.
 
 ## fn confirm
 

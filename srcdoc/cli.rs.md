@@ -2,8 +2,14 @@
 
 ## struct Cli
 
-The directory is a positional argument, the first, so a wrapper can bake it
-in and pass the rest through: `stuff <dir> add rust`.
+`--look` is global, so it may come anywhere on the line, and it overrides the
+look the terminal's answers choose.
+
+## enum CliSource
+
+The first word names where the components come from, so the directory and the
+action read as a sentence: `stuff in <dir> add rust`. `in` is a stuff
+directory; another source is another variant.
 
 ## enum CliAction
 

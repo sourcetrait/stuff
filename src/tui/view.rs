@@ -18,10 +18,8 @@ const PADDING: u16 = 1;
 const INSET: u16 = 1 + PADDING;
 /// The columns a subcomponent is indented by, a level.
 const INDENT: u16 = 4;
-/// The radio box's columns, about square over a card's two lines.
-pub(crate) const RADIO_WIDTH: u16 = 4;
 /// The columns between a row's parts.
-pub(crate) const GAP: u16 = 1;
+const GAP: u16 = 1;
 
 /// Draws the screen showing.
 pub(crate) fn draw(frame: &mut ratatui::Frame, app: &App, icons: &Icons) {
@@ -52,9 +50,7 @@ fn header(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
         r::Layout::horizontal([r::Constraint::Length(tui::icon::ICON_SIZE.width), r::Constraint::Fill(1)])
             .spacing(GAP)
             .areas(row);
-    if let Some(protocol) = &icons.header {
-        frame.render_widget(r::Image::new(protocol), icon_area);
-    }
+    icon(frame, icon_area, icons.header.as_ref());
     lines(
         frame,
         lines_area,
@@ -82,27 +78,21 @@ fn select(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
 /// A component's card, a row in its border: its radio box, its icon, and its title over its summary.
 fn card(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons, i: usize, selected: bool) {
     let component = &app.catalog.components[i];
-    let border = r::Block::bordered()
-        .border_type(r::BorderType::Rounded)
-        .border_style(r::Style::new().fg(PURPLE))
-        .padding(r::Padding::horizontal(PADDING));
-    let inner = border.inner(area);
     if selected {
-        frame.render_widget(border, area);
+        border(frame, area, app.look, PURPLE, None);
     }
+    let inner = area.inner(r::Margin::new(INSET, 1));
     let indent = u16::try_from(component.depth).unwrap_or(u16::MAX).saturating_mul(INDENT).min(inner.width);
     let row = r::Rect { x: inner.x + indent, width: inner.width - indent, ..inner };
     let [radio_area, icon_area, lines_area] = r::Layout::horizontal([
-        r::Constraint::Length(RADIO_WIDTH),
+        r::Constraint::Length(tui::icon::ICON_SIZE.width),
         r::Constraint::Length(tui::icon::ICON_SIZE.width),
         r::Constraint::Fill(1),
     ])
     .spacing(GAP)
     .areas(row);
-    radio(frame, radio_area, app.marks[i]);
-    if let Some(Some(protocol)) = icons.components.get(i) {
-        frame.render_widget(r::Image::new(protocol), icon_area);
-    }
+    icon(frame, radio_area, Some(icons.radios.get(app.marks[i])));
+    icon(frame, icon_area, icons.components.get(i).and_then(Option::as_ref));
     lines(
         frame,
         lines_area,
@@ -118,24 +108,56 @@ fn lines(frame: &mut ratatui::Frame, area: r::Rect, top: r::Line, bottom: r::Lin
     frame.render_widget(bottom, bottom_area);
 }
 
-/// The radio box, a card's two lines tall: an outline on its cells' edges when absent, filled in its mark's color otherwise.
-fn radio(frame: &mut ratatui::Frame, area: r::Rect, mark: Mark) {
-    let fill = match mark {
-        Mark::Absent => {
-            let edge = usize::from(area.width.saturating_sub(2));
-            let style = r::Style::new().fg(r::Color::Gray);
-            let outline = vec![
-                r::Line::styled(format!("🭽{}🭾", "▔".repeat(edge)), style),
-                r::Line::styled(format!("🭼{}🭿", "▁".repeat(edge)), style),
-            ];
-            frame.render_widget(r::Paragraph::new(outline), area);
-            return;
+/// An icon or a radio box in its cells, an image or braille.
+fn icon(frame: &mut ratatui::Frame, area: r::Rect, icon: Option<&Icon>) {
+    match icon {
+        Some(Icon::Image(protocol)) => frame.render_widget(r::Image::new(protocol), area),
+        Some(Icon::Braille(braille)) => frame.render_widget(braille, area),
+        None => {}
+    }
+}
+
+/// A border around an area, a title in its top: rounded lines when pretty; when ugly, a rounded frame
+/// of braille dots, whole in a terminal that leaves gaps between the rows of its line characters.
+fn border(frame: &mut ratatui::Frame, area: r::Rect, look: Look, color: r::Color, title: Option<&str>) {
+    match look {
+        Look::Pretty => {
+            let block = r::Block::bordered().border_type(r::BorderType::Rounded).border_style(r::Style::new().fg(color));
+            frame.render_widget(if let Some(title) = title { block.title(title) } else { block }, area);
         }
-        Mark::Added => r::Color::Gray,
-        Mark::ToAdd => r::Color::Green,
-        Mark::ToRemove => r::Color::Red,
-    };
-    frame.render_widget(r::Block::new().style(r::Style::new().bg(fill)), area);
+        Look::Ugly => {
+            dots(frame.buffer_mut(), area, color);
+            if let Some(title) = title {
+                let place = r::Rect { x: area.x + 2, width: area.width.saturating_sub(4), height: area.height.min(1), ..area };
+                frame.render_widget(r::Line::styled(title, r::Style::new().fg(color)), place);
+            }
+        }
+    }
+}
+
+/// A rounded frame of braille dots around an area: its top edge along the bottom of the area's first
+/// row, its bottom edge along the top of its last, its sides down the outer columns of dots.
+fn dots(buffer: &mut r::Buffer, area: r::Rect, color: r::Color) {
+    if area.width < 2 || area.height < 2 {
+        return;
+    }
+    let (left, right, top, bottom) = (area.left(), area.right() - 1, area.top(), area.bottom() - 1);
+    for y in top..=bottom {
+        for x in left..=right {
+            let symbol = match (x == left, x == right, y == top, y == bottom) {
+                (true, _, true, _) => '⢀',
+                (_, true, true, _) => '⡀',
+                (true, _, _, true) => '⠈',
+                (_, true, _, true) => '⠁',
+                (_, _, true, _) => '⣀',
+                (_, _, _, true) => '⠉',
+                (true, _, _, _) => '⡇',
+                (_, true, _, _) => '⢸',
+                _ => continue,
+            };
+            buffer[(x, y)].set_char(symbol).set_fg(color);
+        }
+    }
 }
 
 /// The preview: each step, a green add or a red remove, in the order it runs.
@@ -169,12 +191,8 @@ fn confirm(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
         height,
     );
     frame.render_widget(r::Clear, popup);
-    let block = r::Block::bordered()
-        .border_type(r::BorderType::Rounded)
-        .border_style(r::Style::new().fg(PURPLE))
-        .title(" Proceed? ");
-    let inner = block.inner(popup);
-    frame.render_widget(block, popup);
+    border(frame, popup, app.look, PURPLE, Some(" Proceed? "));
+    let inner = popup.inner(r::Margin::new(1, 1));
     let [text_area, button_area] =
         r::Layout::vertical([r::Constraint::Min(1), r::Constraint::Length(1)]).areas(inner);
     let text = vec![
@@ -209,12 +227,8 @@ fn button(label: &str, focused: bool) -> r::Span<'static> {
 fn run(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
     let [output_area, status_area] =
         r::Layout::vertical([r::Constraint::Min(3), r::Constraint::Length(1)]).areas(area);
-    let block = r::Block::bordered()
-        .border_type(r::BorderType::Rounded)
-        .border_style(r::Style::new().fg(QUIET))
-        .title(" output ");
-    let inner = block.inner(output_area);
-    frame.render_widget(block, output_area);
+    border(frame, output_area, app.look, QUIET, Some(" output "));
+    let inner = output_area.inner(r::Margin::new(1, 1));
     frame.render_widget(r::Paragraph::new(app.output.tail(usize::from(inner.height))), inner);
     let status = if app.running {
         let step = app.step.map_or(0, |s| s + 1);

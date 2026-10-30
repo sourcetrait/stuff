@@ -1,4 +1,4 @@
-//! The command line: the directory, then an action and its components.
+//! The command line: the source, then an action and its components.
 
 use crate::*;
 
@@ -6,11 +6,25 @@ use crate::*;
 #[derive(Debug, clap::Parser)]
 #[command(name = "stuff", version, about)]
 pub(crate) struct Cli {
-    /// The stuff directory.
-    pub(crate) dir: PathBuf,
-    /// The action; none opens the TUI.
+    /// How the TUI draws; pretty by default where the terminal draws images, ugly elsewhere.
+    #[arg(long, global = true, value_enum)]
+    pub(crate) look: Option<Look>,
+    /// Where the components come from.
     #[command(subcommand)]
-    pub(crate) action: Option<CliAction>,
+    pub(crate) source: CliSource,
+}
+
+/// Where the components come from.
+#[derive(Debug, clap::Subcommand)]
+pub(crate) enum CliSource {
+    /// The components in a stuff directory.
+    In {
+        /// The stuff directory.
+        dir: PathBuf,
+        /// The action; none opens the TUI.
+        #[command(subcommand)]
+        action: Option<CliAction>,
+    },
 }
 
 /// An action on components.

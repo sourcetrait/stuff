@@ -2,7 +2,9 @@
 
 ## fn dispatch
 
-Every component's exists runs before anything else, the TUI's first screen
+The source is taken apart by a `let`, `in` being its one variant; another
+source turns it into a match. Every component's exists runs before anything
+else, the TUI's first screen
 and the CLI's lists and plans alike needing the state. A failing exists
 stops the command: a state it cannot read would make every plan a guess.
 

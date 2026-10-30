@@ -9,25 +9,28 @@ pub(crate) mod run;
 pub(crate) mod runner;
 pub(crate) mod tui {
     pub(crate) mod app;
+    pub(crate) mod braille;
+    pub(crate) mod frame;
     pub(crate) mod icon;
     pub(crate) mod output;
     pub(crate) mod view;
 }
 
 pub(crate) mod r {
+    pub(crate) use ratatui::buffer::Buffer;
     pub(crate) use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
     pub(crate) use ratatui::layout::{Constraint, Flex, Layout, Margin, Rect, Size};
     pub(crate) use ratatui::style::{Color, Modifier, Style};
     pub(crate) use ratatui::text::{Line, Span, Text};
-    pub(crate) use ratatui::widgets::{Block, BorderType, Clear, Padding, Paragraph};
-    pub(crate) use ratatui_image::picker::{Capability, Picker, cap_parser::QueryStdioOptions};
+    pub(crate) use ratatui::widgets::{Block, BorderType, Clear, Paragraph, Widget};
+    pub(crate) use ratatui_image::picker::{Capability, Picker, ProtocolType, cap_parser::QueryStdioOptions};
     pub(crate) use ratatui_image::protocol::Protocol;
     pub(crate) use ratatui_image::{Image, Resize};
 }
 
 pub(crate) use crate::{
-    catalog::{Catalog, Component},
-    cli::{Cli, CliActionKind},
+    catalog::{Catalog, Component, Logo},
+    cli::{Cli, CliActionKind, CliSource},
     config::{ComponentConfig, ComponentConfigToml, StuffConfig, StuffConfigToml},
     error::{
         CatalogResult, GraphSnafu, LayoutSnafu, ParseSnafu, ReadSnafu, RunnerResult, ScriptSnafu,
@@ -36,8 +39,9 @@ pub(crate) use crate::{
     plan::{Plan, Step, StepAction},
     runner::{RunEvent, Runner, Script},
     tui::{
-        app::{App, Button, Mark, Screen},
-        icon::Icons,
+        app::{App, Button, Look, Mark, Screen},
+        braille::Braille,
+        icon::{Icon, Icons},
         output::Output,
     },
 };

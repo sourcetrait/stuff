@@ -1,4 +1,4 @@
-//! The command's run: the directory loaded, then the TUI or the CLI's action.
+//! The command's run: the source loaded, then the TUI or the CLI's action.
 
 use crate::*;
 
@@ -14,13 +14,14 @@ pub fn run() -> ExitCode {
     }
 }
 
-/// Loads the directory, then runs the TUI or the action named.
+/// Loads the source, then runs the TUI or the action named.
 fn dispatch(cli: Cli) -> Result<ExitCode> {
-    let catalog = Catalog::load(&cli.dir)?;
+    let CliSource::In { dir, action } = cli.source;
+    let catalog = Catalog::load(&dir)?;
     let runner = Runner::new(&catalog.dir);
     let added = runner.exists_all(&catalog)?;
-    let Some(action) = cli.action else {
-        return tui::app::run(catalog, runner, added);
+    let Some(action) = action else {
+        return tui::app::run(catalog, runner, added, cli.look);
     };
     let kind = action.kind();
     if action.components().is_empty() {

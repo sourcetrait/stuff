@@ -1,5 +1,11 @@
 # app.rs
 
+## enum Look
+
+Two looks, named for what they are. Some terminals draw images and lines
+well and some don't, and each look does its best for its kind: pretty with
+rounded lines and images, ugly with braille dots.
+
 ## struct App
 
 The explicit marks, `adds` and `removes`, are what the user toggled; the
@@ -27,5 +33,6 @@ cursor stays on the component it was on.
 ## fn run
 
 The terminal is entered before the picker queries it, the query needing raw
-mode; a terminal that answers no graphics query falls back to half-blocks.
-ratatui's `init` installs the panic hook that restores the terminal.
+mode. A terminal that answers with a graphics protocol gets the pretty look
+and any other the ugly one, unless the command names a look. ratatui's `init`
+installs the panic hook that restores the terminal.

@@ -17,11 +17,8 @@ used by the unit tests alone; in the main hub they warn as unused imports.
 
 ## Dependencies
 
-ratatui-image takes its `crossterm` and `chafa-dyn` features, its defaults left
-off for the `image` formats they would add. Where the terminal speaks no image
-protocol, its halfblocks protocol draws an icon through chafa, which picks
-among blocks, braille, and other symbols for a richer picture than half blocks
-alone. `chafa-dyn` finds chafa 1.8.0 or newer through pkg-config and links it
-dynamically: a build needs chafa's development files, Fedora's `chafa-devel`,
-and a run its library, `chafa-libs`. `image` is declared with the `png`
-feature alone, matching the instance ratatui-image builds against.
+ratatui-image takes its `crossterm` feature alone, its defaults left off for
+the `image` formats and the chafa encoder they would add; it finds the
+terminal's graphics protocol and draws images through it. `image` is declared
+with `bmp` and `png` alone, the two forms an icon comes in, the instance
+ratatui-image builds against.
