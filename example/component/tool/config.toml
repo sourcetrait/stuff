@@ -1,0 +1,3 @@
+title = "Tool"
+description = "Depends on base, added after it"
+depends = ["base"]

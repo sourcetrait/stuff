@@ -1,0 +1,51 @@
+[workspace]
+resolver = "3"
+
+[workspace.package]
+version = "0.0.0-0"
+edition = "2024"
+description = "Adds and removes components in a home, through a TUI or a CLI"
+authors = ["SourceTrait <development@sourcetrait.com>"]
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/sourcetrait/stuff"
+homepage = "https://sourcetrait.com"
+categories = []
+keywords = ["sourcetrait", "stuff", "components", "tui"]
+
+[workspace.dependencies]
+ansi-to-tui = "8"
+clap = { version = "4", features = ["derive"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+ratatui = "0.30"
+ratatui-image = { version = "11", default-features = false, features = ["crossterm"] }
+serde = { version = "1", features = ["derive"] }
+snafu = "0.8"
+sourcetrait_common = { path = "../common/crates/sourcetrait_common", version = ">=0.0.0-0", default-features = false, features = ["testing"] }
+toml = "1"
+
+[package]
+name = "sourcetrait_stuff"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[[bin]]
+name = "stuff"
+path = "src/main.rs"
+
+[dependencies]
+ansi-to-tui.workspace = true
+clap.workspace = true
+image.workspace = true
+ratatui.workspace = true
+ratatui-image.workspace = true
+serde.workspace = true
+snafu.workspace = true
+sourcetrait_common.workspace = true
+toml.workspace = true
