@@ -1,21 +1,19 @@
-//! Rounded squares as images: the radio box, and the frame around a component's icon.
+//! The radio box as an image: a rounded square's border, a moat, and the mark's fill inside.
 
 use crate::*;
 
-/// The side of a square's image, in pixels: large enough to be scaled down to any cell size.
+/// The side of a radio box's image, in pixels: large enough to be scaled down to any cell size.
 const SIDE: u32 = 192;
-/// A border's outer half side, in pixels.
+/// The border's outer half side, in pixels.
 const BORDER_HALF: f32 = 88.0;
-/// A border's corner radius, in pixels.
+/// The border's corner radius, in pixels.
 const BORDER_RADIUS: f32 = 32.0;
-/// A border's width, in pixels.
+/// The border's width, in pixels.
 const STROKE: f32 = 14.0;
-/// A radio box's fill's half side, in pixels; the moat lies between it and the border.
+/// The fill's half side, in pixels; the moat lies between it and the border.
 const FILL_HALF: f32 = 48.0;
-/// A radio box's fill's corner radius, in pixels.
+/// The fill's corner radius, in pixels.
 const FILL_RADIUS: f32 = 16.0;
-/// The color of an icon's frame.
-const FRAME: image::Rgba<u8> = image::Rgba([150, 150, 150, 255]);
 
 /// A mark's color, its radio box's border's and its fill's.
 fn color(mark: Mark) -> image::Rgba<u8> {
@@ -37,36 +35,6 @@ pub(crate) fn radio_image(mark: Mark) -> image::DynamicImage {
         *pixel = image::Rgba([red, green, blue, opacity(ring(px, py) + fill)]);
     }
     out.into()
-}
-
-/// An icon framed as an image: a rounded square's border, and the icon inside it, its edges touching
-/// the border and its corners clipped to the border's curve; a bitmap is enlarged pixel for pixel.
-pub(crate) fn framed_image(icon: &image::DynamicImage, filter: image::imageops::FilterType) -> image::DynamicImage {
-    let inside = BORDER_HALF - STROKE;
-    let side = (2.0 * inside).round() as u32;
-    let fitted = icon.resize(side, side, filter).to_rgba8();
-    let mut out = image::RgbaImage::new(SIDE, SIDE);
-    let (left, top) = ((SIDE - fitted.width()) / 2, (SIDE - fitted.height()) / 2);
-    image::imageops::overlay(&mut out, &fitted, i64::from(left), i64::from(top));
-    let [red, green, blue, _] = FRAME.0;
-    for (x, y, pixel) in out.enumerate_pixels_mut() {
-        let (px, py) = centered(x, y);
-        let [icon_red, icon_green, icon_blue, icon_alpha] = pixel.0;
-        let border = ring(px, py);
-        let below = f32::from(icon_alpha) / 255.0 * coverage(rounded(px, py, inside, BORDER_RADIUS - STROKE));
-        let alpha = border + below * (1.0 - border);
-        let mix = |over: u8, under: u8| {
-            let total = f32::from(over) * border + f32::from(under) * below * (1.0 - border);
-            if alpha > 0.0 { (total / alpha).round() as u8 } else { 0 }
-        };
-        *pixel = image::Rgba([mix(red, icon_red), mix(green, icon_green), mix(blue, icon_blue), opacity(alpha)]);
-    }
-    out.into()
-}
-
-/// A bitmap enlarged pixel for pixel to a square's size, so a terminal scales it down rather than up.
-pub(crate) fn enlarged(bitmap: &image::DynamicImage) -> image::DynamicImage {
-    bitmap.resize(SIDE, SIDE, image::imageops::FilterType::Nearest)
 }
 
 /// A pixel's center, relative to the image's.

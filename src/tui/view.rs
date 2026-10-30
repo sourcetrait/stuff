@@ -27,7 +27,7 @@ const INSET: u16 = 1 + PADDING;
 /// The columns between a row's parts.
 const GAP: u16 = 1;
 /// The columns a subcomponent is indented by, a level: a radio box and its gap, so its radio box
-/// lines up under its parent's icon.
+/// lines up under its parent's title.
 pub(crate) const INDENT: u16 = tui::icon::ICON_SIZE.width + GAP;
 
 /// Draws the screen showing.
@@ -79,19 +79,20 @@ fn select(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
         frame.render_widget(r::Paragraph::new(r::Line::styled("no components", r::Style::new().fg(QUIET))), area);
         return;
     }
-    let visible = usize::from((area.height / CARD_ROWS).max(1));
+    // Below the image tier neighbouring cards share a border row, which holds a bar only for the cursor's.
+    let stride = if app.tier == Tier::Image { CARD_ROWS } else { CARD_ROWS - 1 };
+    let visible = usize::from((area.height.saturating_sub(CARD_ROWS - stride) / stride).max(1));
     let start = (app.cursor + 1).saturating_sub(visible);
-    let rows = r::Layout::vertical(vec![r::Constraint::Length(CARD_ROWS); visible])
-        .flex(r::Flex::Start)
-        .split(area);
-    for (&row_area, (row, &i)) in rows.iter().zip(app.order.iter().enumerate().skip(start)) {
-        card(frame, row_area, app, icons, i, row == app.cursor);
+    for (row, &i) in app.order.iter().enumerate().skip(start).take(visible) {
+        let y = area.y + u16::try_from(row - start).unwrap_or(0) * stride;
+        let card_area = r::Rect::new(area.x, y, area.width, CARD_ROWS).intersection(area);
+        card(frame, card_area, app, icons, i, row == app.cursor);
     }
 }
 
-/// A component's card, a row in its border. In the image tier: its radio box, its icon, and its
-/// title over its summary. Below it, no box or icon: the title in its mark's color, and the cursor's
-/// row between two horizontal bars.
+/// A component's card, a row in its border. In the image tier: its radio box, and its title over its
+/// summary. Below it, no box: the title in its mark's color, and the cursor's row between two
+/// horizontal bars.
 fn card(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons, i: usize, selected: bool) {
     let component = &app.catalog.components[i];
     let images = app.tier == Tier::Image;
@@ -109,15 +110,11 @@ fn card(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons, i: 
     let indent = u16::try_from(component.depth).unwrap_or(u16::MAX).saturating_mul(INDENT).min(inner.width);
     let row = r::Rect { x: inner.x + indent, width: inner.width - indent, ..inner };
     let lines_area = if let Some(radios) = icons.radios.as_ref().filter(|_| images) {
-        let [radio_area, icon_area, lines_area] = r::Layout::horizontal([
-            r::Constraint::Length(tui::icon::ICON_SIZE.width),
-            r::Constraint::Length(tui::icon::ICON_SIZE.width),
-            r::Constraint::Fill(1),
-        ])
-        .spacing(GAP)
-        .areas(row);
+        let [radio_area, lines_area] =
+            r::Layout::horizontal([r::Constraint::Length(tui::icon::ICON_SIZE.width), r::Constraint::Fill(1)])
+                .spacing(GAP)
+                .areas(row);
         image(frame, radio_area, radios.get(app.marks[i]));
-        image(frame, icon_area, icons.components.get(i).and_then(Option::as_ref));
         lines_area
     } else {
         row

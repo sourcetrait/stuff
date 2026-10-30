@@ -18,7 +18,7 @@ pub(crate) mod tui {
 
 pub(crate) mod r {
     pub(crate) use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
-    pub(crate) use ratatui::layout::{Constraint, Flex, Layout, Margin, Rect, Size};
+    pub(crate) use ratatui::layout::{Constraint, Layout, Margin, Rect, Size};
     pub(crate) use ratatui::style::{Color, Modifier, Style};
     pub(crate) use ratatui::text::{Line, Span, Text};
     pub(crate) use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
@@ -28,7 +28,7 @@ pub(crate) mod r {
 }
 
 pub(crate) use crate::{
-    catalog::{Catalog, Component, Logo},
+    catalog::{Catalog, Component},
     cli::{Cli, CliActionKind, CliCommand},
     config::{ComponentConfig, ComponentConfigToml, StuffConfig, StuffConfigToml},
     error::{

@@ -24,13 +24,14 @@ enter goes on, and escape goes back or quits.
 
 The TUI draws in the tier of what the terminal does well. The image tier, for
 a terminal with a graphics protocol (kitty's, sixel, or iTerm2's), draws each
-component with a radio box and an icon, and rounded lines. Below it, a
-component's title takes the color of its state instead, blue added, green to
-add, red to remove, and the cursor's row lies between two horizontal bars: the
-lines tier, for a terminal known to draw its own line characters, draws the
-dialog and the output in rounded lines; the plain tier, for any other, in
-none. `--tier image`, `--tier lines`, or `--tier plain` chooses; `stuff probe`
-prints what Stuff finds the terminal able to draw.
+component with a radio box, the stuff directory's icon in the header, and
+rounded lines. Below it, a component's title takes the color of its state
+instead, blue added, green to add, red to remove, and the cursor's row lies
+between two horizontal bars: the lines tier, for a terminal known to draw its
+own line characters, draws the dialog and the output in rounded lines; the
+plain tier, for any other, in none. `--tier image`, `--tier lines`, or `--tier
+plain` chooses; `stuff probe` prints what Stuff finds the terminal able to
+draw.
 
 The stuff directory
 --------------------------------------------------------------------------------
@@ -38,12 +39,9 @@ The stuff directory
 ```
 <dir>/
   config.toml           title = "..."
-  logo.png
-  logo.bmp
+  logo.png              the icon, an image with transparency
   component/<component>/
     config.toml         title, description (80 characters at most), depends
-    logo.png
-    logo.bmp
     exists.nu           exits 0 when the component is added, 1 when not
     add.nu              adds it
     remove.nu           removes it
@@ -55,9 +53,8 @@ subcomponent depends on its parent, and `depends` names any other components
 it needs. A component's `config.toml` may hold keys of its own for its
 scripts to read.
 
-An icon is a `logo.png`, an image with transparency, else a `logo.bmp`, else
-the default; a component's icon sits in a rounded frame, its square's edges
-touching the frame. Icons show in the image tier alone.
+The stuff directory's `logo.png`, else the sourcetrait logo, heads the TUI in
+the image tier.
 
 Each script is a `def main` with no arguments, run by nu from its component's
 directory with your own nushell `env.nu` and `config.nu`, and with

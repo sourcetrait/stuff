@@ -6,27 +6,8 @@ use crate::*;
 pub(crate) const COMPONENT_DIR: &str = "component";
 /// The configuration file the directory and each component carry.
 pub(crate) const CONFIG_FILE: &str = "config.toml";
-/// The icon the directory and each component may carry as an image.
-pub(crate) const LOGO_PNG: &str = "logo.png";
-/// The icon the directory and each component may carry as a bitmap for braille.
-pub(crate) const LOGO_BMP: &str = "logo.bmp";
-
-/// The icon files a directory carries, each where present.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(crate) struct Logo {
-    /// `logo.png`, for a terminal with a graphics protocol.
-    pub(crate) png: Option<PathBuf>,
-    /// `logo.bmp`, drawn in braille.
-    pub(crate) bmp: Option<PathBuf>,
-}
-
-impl Logo {
-    /// The icon files in a directory.
-    pub(crate) fn find(dir: &Path) -> Self {
-        let file = |name: &str| Some(dir.join(name)).filter(|path| path.is_file());
-        Self { png: file(LOGO_PNG), bmp: file(LOGO_BMP) }
-    }
-}
+/// The icon the stuff directory may carry.
+pub(crate) const LOGO_FILE: &str = "logo.png";
 
 /// A component as found, its dependencies still names.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,8 +20,6 @@ pub(crate) struct ComponentSpec {
     pub(crate) parent: Option<usize>,
     /// Its directory.
     pub(crate) dir: PathBuf,
-    /// Its icon files.
-    pub(crate) logo: Logo,
 }
 
 /// One component: its name, its card, its place in the graph, and its files.
@@ -62,8 +41,6 @@ pub(crate) struct Component {
     pub(crate) depth: usize,
     /// Its directory.
     pub(crate) dir: PathBuf,
-    /// Its icon files.
-    pub(crate) logo: Logo,
 }
 
 /// The stuff directory: its configuration and its components in tree order.
@@ -73,8 +50,8 @@ pub(crate) struct Catalog {
     pub(crate) dir: PathBuf,
     /// Its configuration.
     pub(crate) config: StuffConfig,
-    /// Its icon files.
-    pub(crate) logo: Logo,
+    /// Its icon, when it carries one.
+    pub(crate) icon: Option<PathBuf>,
     /// Every component, each parent before its children.
     pub(crate) components: Vec<Component>,
 }
@@ -84,20 +61,20 @@ impl Catalog {
     pub(crate) fn load(dir: &Path) -> CatalogResult<Self> {
         let dir = std::fs::canonicalize(dir).context(ReadSnafu { path: display(dir) })?;
         let config: StuffConfigToml = read_toml(&dir.join(CONFIG_FILE))?;
-        let logo = Logo::find(&dir);
+        let icon = Some(dir.join(LOGO_FILE)).filter(|path| path.is_file());
         let mut specs = Vec::new();
         let root = dir.join(COMPONENT_DIR);
         if root.is_dir() {
             collect(&root, None, "", &mut specs)?;
         }
-        Self::from_specs(dir, config.into(), logo, specs)
+        Self::from_specs(dir, config.into(), icon, specs)
     }
 
     /// Builds a catalog from its specs, resolving the dependencies and checking them.
     pub(crate) fn from_specs(
         dir: PathBuf,
         config: StuffConfig,
-        logo: Logo,
+        icon: Option<PathBuf>,
         specs: Vec<ComponentSpec>,
     ) -> CatalogResult<Self> {
         let index: HashMap<&str, usize> =
@@ -132,7 +109,6 @@ impl Catalog {
                 depends,
                 depth,
                 dir: spec.dir.clone(),
-                logo: spec.logo.clone(),
             });
         }
         for i in 0..components.len() {
@@ -140,7 +116,7 @@ impl Catalog {
                 components[parent].children.push(i);
             }
         }
-        let catalog = Self { dir, config, logo, components };
+        let catalog = Self { dir, config, icon, components };
         catalog.check_acyclic()?;
         Ok(catalog)
     }
@@ -286,9 +262,8 @@ fn collect(
         let toml: ComponentConfigToml = read_toml(&config_path)?;
         let config = ComponentConfig::try_from(toml)
             .map_err(|reason| LayoutSnafu { path: display(&config_path), reason }.build())?;
-        let logo = Logo::find(&path);
         let index = specs.len();
-        specs.push(ComponentSpec { id: id.clone(), config, parent, dir: path.clone(), logo });
+        specs.push(ComponentSpec { id: id.clone(), config, parent, dir: path.clone() });
         collect(&path, Some(index), &id, specs)?;
     }
     Ok(())

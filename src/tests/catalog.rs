@@ -11,7 +11,6 @@ pub(super) fn spec(id: &str, parent: Option<usize>, depends: &[&str]) -> Compone
         },
         parent,
         dir: PathBuf::from("/stuff/component").join(id),
-        logo: Logo::default(),
     }
 }
 
@@ -20,7 +19,7 @@ pub(super) fn catalog() -> Catalog {
     Catalog::from_specs(
         PathBuf::from("/stuff"),
         StuffConfig { title: "Test".to_string() },
-        Logo::default(),
+        None,
         vec![
             spec("git", None, &[]),
             spec("rust", None, &[]),
@@ -61,7 +60,7 @@ fn a_dependency_on_no_component_is_refused() {
     let error = Catalog::from_specs(
         PathBuf::from("/c"),
         StuffConfig { title: "Test".to_string() },
-        Logo::default(),
+        None,
         vec![spec("a", None, &["missing"])],
     )
     .expect_err("an unknown dependency");
@@ -73,7 +72,7 @@ fn a_dependency_cycle_is_refused() {
     let error = Catalog::from_specs(
         PathBuf::from("/c"),
         StuffConfig { title: "Test".to_string() },
-        Logo::default(),
+        None,
         vec![spec("a", None, &["b"]), spec("b", None, &["a"])],
     )
     .expect_err("a cycle");

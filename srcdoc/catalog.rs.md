@@ -1,10 +1,5 @@
 # catalog.rs
 
-## struct Logo
-
-The directory and each component may carry an icon in two forms, a png and a
-bmp; which is drawn is the TUI's choice, by what the terminal can show.
-
 ## struct Catalog
 
 ### fn load

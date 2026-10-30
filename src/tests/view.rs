@@ -5,7 +5,7 @@ use super::catalog::catalog;
 fn render(app: &App, width: u16, height: u16) -> ratatui::buffer::Buffer {
     let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(width, height))
         .expect("a test terminal");
-    let icons = Icons::none(app.catalog.components.len());
+    let icons = Icons::none();
     terminal.draw(|frame| tui::view::draw(frame, app, &icons)).expect("a frame");
     terminal.backend().buffer().clone()
 }

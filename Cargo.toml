@@ -15,7 +15,7 @@ keywords = ["sourcetrait", "stuff", "components", "tui"]
 [workspace.dependencies]
 ansi-to-tui = "8"
 clap = { version = "4", features = ["derive"] }
-image = { version = "0.25", default-features = false, features = ["bmp", "png"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
 ratatui = "0.30"
 ratatui-image = { version = "11", default-features = false, features = ["crossterm"] }
 serde = { version = "1", features = ["derive"] }

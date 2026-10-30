@@ -1,11 +1,9 @@
-//! The icons and the radio boxes, images for a terminal with a graphics protocol.
+//! The header's icon and the radio boxes, images for a terminal with a graphics protocol.
 
 use crate::*;
 
-/// An icon's cells, and a radio box's: four columns by two rows, near square in most fonts.
+/// The header icon's cells, and a radio box's: four columns by two rows, near square in most fonts.
 pub(crate) const ICON_SIZE: r::Size = r::Size::new(4, 2);
-/// The default component icon: three dots in a triangle.
-const DEFAULT_ICON: &[u8] = include_bytes!("../../assets/icon/default.png");
 /// The default header icon: the sourcetrait logo.
 const DEFAULT_LOGO: &[u8] = include_bytes!("../../assets/icon/sourcetrait.png");
 
@@ -40,13 +38,10 @@ impl Radios {
     }
 }
 
-/// The images ready to draw: the header's icon, each component's by index, and the radio boxes;
-/// none below the image tier.
+/// The images ready to draw: the header's icon and the radio boxes; none below the image tier.
 pub(crate) struct Icons {
     /// The header's icon.
     pub(crate) header: Option<r::Protocol>,
-    /// Each component's icon, framed, by index.
-    pub(crate) components: Vec<Option<r::Protocol>>,
     /// The radio box of each mark.
     pub(crate) radios: Option<Radios>,
 }
@@ -59,24 +54,28 @@ struct Images<'a> {
 
 impl Icons {
     /// No images, for a terminal below the image tier and for a test.
-    pub(crate) fn none(count: usize) -> Self {
-        Self { header: None, components: (0..count).map(|_| None).collect(), radios: None }
+    pub(crate) fn none() -> Self {
+        Self { header: None, radios: None }
     }
 
-    /// Every icon and radio box as an image in the image tier, where the picker found a graphics
-    /// protocol; none below it.
+    /// The header's icon and the radio boxes as images in the image tier, where the picker found a
+    /// graphics protocol; none below it.
     pub(crate) fn load(catalog: &Catalog, picker: &r::Picker, background: Option<image::Rgba<u8>>, tier: Tier) -> Self {
         if tier != Tier::Image || !graphics(picker) {
-            return Self::none(catalog.components.len());
+            return Self::none();
         }
         let sixel = matches!(picker.protocol_type(), r::ProtocolType::Sixel);
         let background = background.filter(|_| sixel);
         let mut picker = picker.clone();
         picker.set_background_color(background);
         let images = Images { picker: &picker, background };
-        let header = icon(&images, &catalog.logo, DEFAULT_LOGO, false);
-        let components = catalog.components.iter().map(|component| icon(&images, &component.logo, DEFAULT_ICON, true)).collect();
-        Self { header, components, radios: Some(Radios::load(&images)) }
+        let header = catalog
+            .icon
+            .as_deref()
+            .and_then(|path| image::open(path).ok())
+            .or_else(|| image::load_from_memory(DEFAULT_LOGO).ok())
+            .and_then(|image| images.protocol(image));
+        Self { header, radios: Some(Radios::load(&images)) }
     }
 }
 
@@ -109,27 +108,6 @@ pub(crate) fn background(picker: &r::Picker) -> Option<image::Rgba<u8>> {
         r::Capability::Background(red, green, blue) => Some(image::Rgba([*red, *green, *blue, 255])),
         _ => None,
     })
-}
-
-/// An icon as an image: the png, else the bmp enlarged pixel for pixel, else the default; a
-/// component's framed.
-fn icon(images: &Images, logo: &Logo, default: &[u8], framed: bool) -> Option<r::Protocol> {
-    use image::imageops::FilterType::{Nearest, Triangle};
-    let open = |path: Option<&Path>| path.and_then(|path| image::open(path).ok());
-    let drawn = |image: image::DynamicImage, filter| {
-        let image = if framed {
-            tui::frame::framed_image(&image, filter)
-        } else if filter == Nearest {
-            tui::frame::enlarged(&image)
-        } else {
-            image
-        };
-        images.protocol(image)
-    };
-    open(logo.png.as_deref())
-        .and_then(|image| drawn(image, Triangle))
-        .or_else(|| open(logo.bmp.as_deref()).and_then(|bitmap| drawn(bitmap, Nearest)))
-        .or_else(|| image::load_from_memory(default).ok().and_then(|image| drawn(image, Triangle)))
 }
 
 /// An image laid over a solid background, its transparency gone.
