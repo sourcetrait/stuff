@@ -14,6 +14,7 @@ stuff in <dir> add                     lists the components not added
 stuff in <dir> remove                  lists the components added
 stuff in <dir> add <components>...     adds them, with what they depend on
 stuff in <dir> remove <components>...  removes them, with what depends on them
+stuff probe                            what the terminal can draw
 ```
 
 `in` names the source: the components in a stuff directory.
@@ -21,11 +22,13 @@ stuff in <dir> remove <components>...  removes them, with what depends on them
 In the TUI, `w` `a` `s` `d` move, space marks a component to add or remove,
 enter goes on, and escape goes back or quits.
 
-The TUI has two looks. Pretty draws rounded lines, and images through the
-terminal's graphics protocol; ugly draws in braille dots, which come out whole
-in a terminal that leaves gaps between the rows of its line characters. A
-terminal with a graphics protocol gets pretty, any other ugly; `--look pretty`
-or `--look ugly` chooses.
+The TUI draws in the tier of what the terminal does well. The image tier, for
+a terminal with a graphics protocol (kitty's, sixel, or iTerm2's), draws
+rounded lines and images. The lines tier, for a terminal known to draw its own
+line characters, draws rounded lines and colors. The plain tier, for any
+other, draws colors alone, tinting where it would draw a border. `--tier
+image`, `--tier lines`, or `--tier plain` chooses; `stuff probe` prints what
+Stuff finds the terminal able to draw.
 
 The stuff directory
 --------------------------------------------------------------------------------
@@ -51,13 +54,10 @@ it needs. A component's `config.toml` may hold keys of its own for its
 scripts to read.
 
 An icon comes as `logo.png`, an image with transparency, and as `logo.bmp`, a
-bitmap drawn in braille: each pixel a dot in its own color, black and
-transparent pixels empty, a cell holding two dots across and four down. A
-terminal with a graphics protocol (kitty's, sixel, or iTerm2's) shows the
-png; otherwise, or without a png, the bmp is drawn; without either, the
-default in the form the terminal can show. A component's icon sits in a
-rounded frame, its bmp six pixels square inside it; the directory's icon,
-unframed in the header, is eight pixels square.
+bitmap four pixels square, its black and transparent pixels clear. The image
+tier shows the png, else the bmp, else the default png, a component's icon in
+a rounded frame. The other tiers draw the bmp, else the default bmp, in
+half-block pixels, two to a cell, one over the other.
 
 Each script is a `def main` with no arguments, run by nu from its component's
 directory with your own nushell `env.nu` and `config.nu`, and with

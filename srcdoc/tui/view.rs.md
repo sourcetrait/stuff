@@ -27,16 +27,16 @@ tests find the radio box from the title by those widths.
 
 ## fn icon
 
-An icon and a radio box draw the same way, an image through the graphics
-protocol or a bitmap in braille.
+An icon and a radio box draw the same way: an image through the graphics
+protocol, half-block pixels, or a box filled with a color.
 
-## fn border, fn dots
+## fn border
 
 A terminal that draws box-drawing characters from its font, rather than
 filling their cells itself, can leave a gap between the rows of a vertical
-line. Pretty draws rounded lines; ugly draws a rounded frame of braille dots,
-whose spacing hides those gaps, its top edge along the bottom of the first
-row and its bottom edge along the top of the last.
+line. The image and lines tiers draw rounded lines; the plain tier draws no
+line character, tinting the cursor's row and the dialog instead, a cell's
+background filling the cell in every terminal.
 
 ## fn confirm
 

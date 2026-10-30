@@ -18,13 +18,15 @@ pub(crate) enum Screen {
     Run,
 }
 
-/// How the TUI draws: pretty where the terminal draws images and lines well, ugly where it doesn't.
+/// What the terminal draws well, a tier of its capabilities.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
-pub(crate) enum Look {
-    /// Rounded lines for borders.
-    Pretty,
-    /// Braille dots for borders.
-    Ugly,
+pub(crate) enum Tier {
+    /// Images through a graphics protocol, and rounded lines.
+    Image,
+    /// Rounded lines the terminal draws itself, and colors.
+    Lines,
+    /// Colors alone, no line characters.
+    Plain,
 }
 
 /// Which dialog button has the focus.
@@ -91,8 +93,8 @@ pub(crate) struct App {
     pub(crate) running: bool,
     /// The run's failure, when it failed.
     pub(crate) failure: Option<String>,
-    /// How the TUI draws.
-    pub(crate) look: Look,
+    /// What the terminal draws well.
+    pub(crate) tier: Tier,
 }
 
 impl App {
@@ -114,7 +116,7 @@ impl App {
             step: None,
             running: false,
             failure: None,
-            look: Look::Pretty,
+            tier: Tier::Lines,
         };
         app.remark();
         app
@@ -271,13 +273,14 @@ impl App {
     }
 }
 
-/// Runs the TUI until the user leaves it, pretty where the terminal draws images unless a look is given.
-pub(crate) fn run(catalog: Catalog, runner: Runner, added: Vec<bool>, look: Option<Look>) -> Result<ExitCode> {
+/// Runs the TUI until the user leaves it, in the tier given or the one the terminal is found in.
+pub(crate) fn run(catalog: Catalog, runner: Runner, added: Vec<bool>, tier: Option<Tier>) -> Result<ExitCode> {
     let mut terminal = ratatui::init();
     let picker = tui::icon::picker();
-    let icons = Icons::load(&catalog, &picker, tui::icon::background(&picker));
+    let tier = tier.unwrap_or_else(|| tui::tier::detect(&picker));
+    let icons = Icons::load(&catalog, &picker, tui::icon::background(&picker), tier);
     let mut app = App::new(catalog, added);
-    app.look = look.unwrap_or(if tui::icon::graphics(&picker) { Look::Pretty } else { Look::Ugly });
+    app.tier = tier;
     let outcome = drive(&mut terminal, app, &runner, &icons);
     ratatui::restore();
     outcome

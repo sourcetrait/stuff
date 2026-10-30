@@ -16,12 +16,15 @@ pub fn run() -> ExitCode {
 
 /// Loads the source, then runs the TUI or the action named.
 fn dispatch(cli: Cli) -> Result<ExitCode> {
-    let CliSource::In { dir, action } = cli.source;
+    let (dir, action) = match cli.command {
+        CliCommand::In { dir, action } => (dir, action),
+        CliCommand::Probe => return tui::tier::probe(),
+    };
     let catalog = Catalog::load(&dir)?;
     let runner = Runner::new(&catalog.dir);
     let added = runner.exists_all(&catalog)?;
     let Some(action) = action else {
-        return tui::app::run(catalog, runner, added, cli.look);
+        return tui::app::run(catalog, runner, added, cli.tier);
     };
     let kind = action.kind();
     if action.components().is_empty() {

@@ -1,4 +1,4 @@
-//! The command line: the source, then an action and its components.
+//! The command line: the source, then an action and its components; or the probe.
 
 use crate::*;
 
@@ -6,17 +6,17 @@ use crate::*;
 #[derive(Debug, clap::Parser)]
 #[command(name = "stuff", version, about)]
 pub(crate) struct Cli {
-    /// How the TUI draws; pretty by default where the terminal draws images, ugly elsewhere.
+    /// What the TUI draws with: image, lines, or plain; by default what the terminal is found to draw well.
     #[arg(long, global = true, value_enum)]
-    pub(crate) look: Option<Look>,
-    /// Where the components come from.
+    pub(crate) tier: Option<Tier>,
+    /// What to do.
     #[command(subcommand)]
-    pub(crate) source: CliSource,
+    pub(crate) command: CliCommand,
 }
 
-/// Where the components come from.
+/// What to do: work on the components from a source, or report what the terminal can draw.
 #[derive(Debug, clap::Subcommand)]
-pub(crate) enum CliSource {
+pub(crate) enum CliCommand {
     /// The components in a stuff directory.
     In {
         /// The stuff directory.
@@ -25,6 +25,8 @@ pub(crate) enum CliSource {
         #[command(subcommand)]
         action: Option<CliAction>,
     },
+    /// Reports what the terminal can draw: its tier, graphics protocol, and cell size.
+    Probe,
 }
 
 /// An action on components.

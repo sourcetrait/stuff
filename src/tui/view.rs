@@ -6,6 +6,8 @@ use crate::*;
 pub(crate) const PURPLE: r::Color = r::Color::Rgb(160, 100, 240);
 /// The color of the legend and other quiet text.
 pub(crate) const QUIET: r::Color = r::Color::DarkGray;
+/// The plain tier's stand-in for a purple border: a dark purple behind the cursor's row and the dialog.
+const TINT: r::Color = r::Color::Rgb(48, 32, 76);
 /// The list's legend.
 pub(crate) const LEGEND_SELECT: &str = "<< [esc]     [w][a][s][d] [space]     [enter] >>";
 /// The legend of the preview and the finished run.
@@ -79,7 +81,7 @@ fn select(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
 fn card(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons, i: usize, selected: bool) {
     let component = &app.catalog.components[i];
     if selected {
-        border(frame, area, app.look, PURPLE, None);
+        border(frame, area, app.tier, PURPLE, None, Some(TINT));
     }
     let inner = area.inner(r::Margin::new(INSET, 1));
     let indent = u16::try_from(component.depth).unwrap_or(u16::MAX).saturating_mul(INDENT).min(inner.width);
@@ -108,55 +110,37 @@ fn lines(frame: &mut ratatui::Frame, area: r::Rect, top: r::Line, bottom: r::Lin
     frame.render_widget(bottom, bottom_area);
 }
 
-/// An icon or a radio box in its cells, an image or braille.
+/// An icon or a radio box in its cells: an image, half-block pixels, or a filled box.
 fn icon(frame: &mut ratatui::Frame, area: r::Rect, icon: Option<&Icon>) {
     match icon {
         Some(Icon::Image(protocol)) => frame.render_widget(r::Image::new(protocol), area),
-        Some(Icon::Braille(braille)) => frame.render_widget(braille, area),
+        Some(Icon::Pixels(pixels)) => frame.render_widget(pixels, area),
+        Some(Icon::Fill(color)) => frame.render_widget(r::Block::new().style(r::Style::new().bg(*color)), area),
         None => {}
     }
 }
 
-/// A border around an area, a title in its top: rounded lines when pretty; when ugly, a rounded frame
-/// of braille dots, whole in a terminal that leaves gaps between the rows of its line characters.
-fn border(frame: &mut ratatui::Frame, area: r::Rect, look: Look, color: r::Color, title: Option<&str>) {
-    match look {
-        Look::Pretty => {
-            let block = r::Block::bordered().border_type(r::BorderType::Rounded).border_style(r::Style::new().fg(color));
-            frame.render_widget(if let Some(title) = title { block.title(title) } else { block }, area);
-        }
-        Look::Ugly => {
-            dots(frame.buffer_mut(), area, color);
-            if let Some(title) = title {
-                let place = r::Rect { x: area.x + 2, width: area.width.saturating_sub(4), height: area.height.min(1), ..area };
-                frame.render_widget(r::Line::styled(title, r::Style::new().fg(color)), place);
-            }
-        }
-    }
-}
-
-/// A rounded frame of braille dots around an area: its top edge along the bottom of the area's first
-/// row, its bottom edge along the top of its last, its sides down the outer columns of dots.
-fn dots(buffer: &mut r::Buffer, area: r::Rect, color: r::Color) {
-    if area.width < 2 || area.height < 2 {
+/// A border around an area, a title in its top: rounded lines where the terminal draws lines; in the
+/// plain tier, which draws none, the area tinted where a tint is given, the title on its top row.
+fn border(
+    frame: &mut ratatui::Frame,
+    area: r::Rect,
+    tier: Tier,
+    color: r::Color,
+    title: Option<&str>,
+    tint: Option<r::Color>,
+) {
+    if tier != Tier::Plain {
+        let block = r::Block::bordered().border_type(r::BorderType::Rounded).border_style(r::Style::new().fg(color));
+        frame.render_widget(if let Some(title) = title { block.title(title) } else { block }, area);
         return;
     }
-    let (left, right, top, bottom) = (area.left(), area.right() - 1, area.top(), area.bottom() - 1);
-    for y in top..=bottom {
-        for x in left..=right {
-            let symbol = match (x == left, x == right, y == top, y == bottom) {
-                (true, _, true, _) => '⢀',
-                (_, true, true, _) => '⡀',
-                (true, _, _, true) => '⠈',
-                (_, true, _, true) => '⠁',
-                (_, _, true, _) => '⣀',
-                (_, _, _, true) => '⠉',
-                (true, _, _, _) => '⡇',
-                (_, true, _, _) => '⢸',
-                _ => continue,
-            };
-            buffer[(x, y)].set_char(symbol).set_fg(color);
-        }
+    if let Some(tint) = tint {
+        frame.render_widget(r::Block::new().style(r::Style::new().bg(tint)), area);
+    }
+    if let Some(title) = title {
+        let place = r::Rect { x: area.x + 1, width: area.width.saturating_sub(2), height: area.height.min(1), ..area };
+        frame.render_widget(r::Line::styled(title, r::Style::new().fg(color).add_modifier(r::Modifier::BOLD)), place);
     }
 }
 
@@ -191,7 +175,7 @@ fn confirm(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
         height,
     );
     frame.render_widget(r::Clear, popup);
-    border(frame, popup, app.look, PURPLE, Some(" Proceed? "));
+    border(frame, popup, app.tier, PURPLE, Some(" Proceed? "), Some(TINT));
     let inner = popup.inner(r::Margin::new(1, 1));
     let [text_area, button_area] =
         r::Layout::vertical([r::Constraint::Min(1), r::Constraint::Length(1)]).areas(inner);
@@ -227,7 +211,7 @@ fn button(label: &str, focused: bool) -> r::Span<'static> {
 fn run(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
     let [output_area, status_area] =
         r::Layout::vertical([r::Constraint::Min(3), r::Constraint::Length(1)]).areas(area);
-    border(frame, output_area, app.look, QUIET, Some(" output "));
+    border(frame, output_area, app.tier, QUIET, Some(" output "), None);
     let inner = output_area.inner(r::Margin::new(1, 1));
     frame.render_widget(r::Paragraph::new(app.output.tail(usize::from(inner.height))), inner);
     let status = if app.running {

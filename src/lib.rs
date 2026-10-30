@@ -9,10 +9,11 @@ pub(crate) mod run;
 pub(crate) mod runner;
 pub(crate) mod tui {
     pub(crate) mod app;
-    pub(crate) mod braille;
     pub(crate) mod frame;
     pub(crate) mod icon;
     pub(crate) mod output;
+    pub(crate) mod pixels;
+    pub(crate) mod tier;
     pub(crate) mod view;
 }
 
@@ -30,7 +31,7 @@ pub(crate) mod r {
 
 pub(crate) use crate::{
     catalog::{Catalog, Component, Logo},
-    cli::{Cli, CliActionKind, CliSource},
+    cli::{Cli, CliActionKind, CliCommand},
     config::{ComponentConfig, ComponentConfigToml, StuffConfig, StuffConfigToml},
     error::{
         CatalogResult, GraphSnafu, LayoutSnafu, ParseSnafu, ReadSnafu, RunnerResult, ScriptSnafu,
@@ -39,10 +40,10 @@ pub(crate) use crate::{
     plan::{Plan, Step, StepAction},
     runner::{RunEvent, Runner, Script},
     tui::{
-        app::{App, Button, Look, Mark, Screen},
-        braille::Braille,
+        app::{App, Button, Mark, Screen, Tier},
         icon::{Icon, Icons},
         output::Output,
+        pixels::Pixels,
     },
 };
 #[cfg(test)]

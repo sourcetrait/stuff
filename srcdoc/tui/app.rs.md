@@ -1,10 +1,9 @@
 # app.rs
 
-## enum Look
+## enum Tier
 
-Two looks, named for what they are. Some terminals draw images and lines
-well and some don't, and each look does its best for its kind: pretty with
-rounded lines and images, ugly with braille dots.
+Terminals draw images and lines with different success, so the TUI draws in
+tiers of what they can do, the same row structure in each (tier.rs).
 
 ## struct App
 
@@ -32,7 +31,6 @@ cursor stays on the component it was on.
 
 ## fn run
 
-The terminal is entered before the picker queries it, the query needing raw
-mode. A terminal that answers with a graphics protocol gets the pretty look
-and any other the ugly one, unless the command names a look. ratatui's `init`
+The terminal is entered before the picker queries it, and the tier is settled
+before the icons load, since it decides how they are drawn. ratatui's `init`
 installs the panic hook that restores the terminal.
