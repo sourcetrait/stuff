@@ -1,0 +1,16 @@
+<!--
+SourceTrait Logo: Icon
+Drawn for an icon's frame: the mark inset to 72% of the square, clear of the
+frame's rounded corners, its diagonal gap widened to read at thirty pixels.
+Copyright (C) 2026 Asmov LLC https://asmov.software
+License AGPL3 https://www.gnu.org/licenses/agpl-3.0.txt
+-->
+<svg
+    version="1.1" xmlns="http://www.w3.org/2000/svg"
+    width="100" height="100"
+    viewBox="0 0 100 100">
+<g fill="#ffff00">
+    <polygon points="34.58,14 86,14 71.31,80.12" />
+    <polygon points="28.69,19.88 14,86 65.42,86" />
+</g>
+</svg>
