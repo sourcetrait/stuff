@@ -8,10 +8,34 @@ pub fn run() -> ExitCode {
     match dispatch(cli) {
         Ok(code) => code,
         Err(error) => {
-            eprintln!("stuff: {error}");
+            eprintln!("{}", line(Tone::Error, &error.to_string()));
             ExitCode::FAILURE
         }
     }
+}
+
+/// The tone of a user-facing line, its `[stuff]`'s color.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Tone {
+    /// Blue: what is happening.
+    Info,
+    /// Green: done, and done well.
+    Success,
+    /// Red: what failed, on stderr.
+    Error,
+    /// Yellow: a warning on stderr, or the line before a prompt.
+    Attention,
+}
+
+/// A user-facing line: `[stuff]` in its tone's color, then the message.
+pub(crate) fn line(tone: Tone, message: &str) -> String {
+    let color = match tone {
+        Tone::Info => 34,
+        Tone::Success => 32,
+        Tone::Error => 31,
+        Tone::Attention => 33,
+    };
+    format!("\x1b[{color}m[stuff]\x1b[0m {message}")
 }
 
 /// Reports on the terminal, or loads the stuff, then runs the TUI or the action named.
@@ -77,10 +101,9 @@ fn nuon_string(text: &str) -> String {
     format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
-/// The warning a removal gives where its component has no remove script: yellow `[stuff]`, then
-/// the component's name.
+/// The warning a removal gives where its component has no remove script.
 pub(crate) fn unsupported_remove(id: &str) -> String {
-    format!("\x1b[33m[stuff]\x1b[0m remove not supported: {id}")
+    line(Tone::Attention, &format!("remove not supported: {id}"))
 }
 
 /// Prints the components added, or those not, one a line.
@@ -102,11 +125,12 @@ fn execute(catalog: &Catalog, runner: &Runner, plan: &Plan, kind: CliActionKind)
             CliActionKind::Add => "add",
             _ => "remove",
         };
-        println!("nothing to {verb}");
+        println!("{}", line(Tone::Info, &format!("nothing to {verb}")));
         return Ok(());
     }
     for step in &plan.steps {
-        println!("[{}] {}", step.action.label(), catalog.components[step.component].id);
+        let message = format!("plan: {} {}", step.action.label(), catalog.components[step.component].id);
+        println!("{}", line(Tone::Info, &message));
     }
     let mut unsupported = Vec::new();
     let mut outcome = Ok(());
@@ -116,14 +140,14 @@ fn execute(catalog: &Catalog, runner: &Runner, plan: &Plan, kind: CliActionKind)
             unsupported.push(component.id.as_str());
             continue;
         }
-        println!("== {} {}", step.action.label(), component.id);
+        println!("{}", line(Tone::Info, &format!("{} {}", step.action.label(), component.id)));
         if let Err(error) = runner.step_inherit(component, step.action) {
             outcome = Err(error.into());
             break;
         }
     }
     if outcome.is_ok() {
-        println!("done");
+        println!("{}", line(Tone::Success, "done"));
     }
     for id in unsupported {
         eprintln!("{}", unsupported_remove(id));

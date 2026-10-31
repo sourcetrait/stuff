@@ -1,5 +1,12 @@
 # run.rs
 
+## fn line
+
+The estate's convention for a user-facing line: `[stuff]` in its tone's color,
+blue info, green done, red an error, yellow attention, then the message. The
+lines a script writes, and the CLI's lists and health records, which agents
+read, stay as they are.
+
 ## fn dispatch
 
 `--probe` reports and returns. The source is a stuff directory when it holds
