@@ -49,15 +49,53 @@ pub(crate) enum Mark {
     ToRemove,
 }
 
-/// What a key asks of the loop beyond the state.
+/// What a key or an event asks of the loop beyond the state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Request {
     /// Leave the TUI.
     Quit,
-    /// Start the plan's run.
-    Start,
-    /// Check every component again and return to the list.
-    Refresh,
+    /// Run the plan's step, by its index.
+    Step(usize),
+    /// Check every component, then show the list.
+    Check,
+    /// Start sudo validating the credential.
+    Validate,
+    /// Write the typed password to sudo.
+    Send,
+    /// End sudo, its dialog left.
+    Cancel,
+}
+
+/// What follows once sudo holds the credential.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Then {
+    /// The plan's step, by its index.
+    Step(usize),
+    /// Every component checked.
+    Check,
+}
+
+/// The sudo dialog: sudo's own exchange in a mini terminal, the password typed unseen.
+#[derive(Debug, Clone)]
+pub(crate) struct SudoDialog {
+    /// What sudo wrote, a line end after each password sent.
+    pub(crate) terminal: Output,
+    /// The password being typed.
+    pub(crate) password: Secret,
+    /// Whether the dialog shows: from the start before a run or a check, and for a refresh once
+    /// sudo writes, a refresh with the credential cached writing nothing.
+    pub(crate) shown: bool,
+    /// Whether sudo ended without the credential.
+    pub(crate) failed: bool,
+    /// What follows once sudo holds the credential.
+    pub(crate) then: Then,
+}
+
+impl SudoDialog {
+    /// The dialog for a validation, shown from the start or not.
+    pub(crate) fn new(then: Then, shown: bool) -> Self {
+        Self { terminal: Output::default(), password: Secret::default(), shown, failed: false, then }
+    }
 }
 
 /// The TUI's state.
@@ -67,6 +105,9 @@ pub(crate) struct App {
     pub(crate) catalog: Catalog,
     /// Whether each component is added, by index.
     pub(crate) added: Vec<bool>,
+    /// Whether the components have been checked, which the first check waits on the dialog for
+    /// where a present script is super.
+    pub(crate) checked: bool,
     /// The list's order, by index.
     pub(crate) order: Vec<usize>,
     /// The cursor's position in the list.
@@ -91,6 +132,8 @@ pub(crate) struct App {
     pub(crate) running: bool,
     /// The run's failure, when it failed.
     pub(crate) failure: Option<String>,
+    /// The sudo dialog, while sudo validates.
+    pub(crate) sudo: Option<SudoDialog>,
     /// How the TUI looks.
     pub(crate) look: Look,
     /// The preview's first line showing.
@@ -107,6 +150,7 @@ impl App {
             marks: Vec::new(),
             catalog,
             added,
+            checked: true,
             order,
             cursor: 0,
             adds: Vec::new(),
@@ -118,11 +162,21 @@ impl App {
             step: None,
             running: false,
             failure: None,
+            sudo: None,
             look: Look::Simple,
             scroll: 0,
             body_rows: 0,
         };
         app.remark();
+        app
+    }
+
+    /// The TUI's state before its first check, which waits on the sudo dialog.
+    pub(crate) fn unchecked(catalog: Catalog) -> Self {
+        let added = vec![false; catalog.components.len()];
+        let mut app = Self::new(catalog, added);
+        app.checked = false;
+        app.sudo = Some(SudoDialog::new(Then::Check, true));
         app
     }
 
@@ -155,9 +209,26 @@ impl App {
     }
 
     /// Applies a key, returning what the loop must do beyond the state. `w` `a` `s` `d`, helix's
-    /// `k` `h` `j` `l`, and the arrows move alike, and `q` is escape.
+    /// `k` `h` `j` `l`, and the arrows move alike, and `q` is escape. While the sudo dialog shows,
+    /// every key but enter and escape is the password's.
     pub(crate) fn key(&mut self, code: r::KeyCode) -> Option<Request> {
-        use r::KeyCode::{Char, Down, Enter, Esc, Left, Right, Tab, Up};
+        use r::KeyCode::{Backspace, Char, Down, Enter, Esc, Left, Right, Tab, Up};
+        if let Some(sudo) = self.sudo.as_mut() {
+            if !sudo.shown {
+                return None;
+            }
+            match code {
+                Esc => return self.leave_sudo(),
+                Enter if !sudo.failed => {
+                    sudo.terminal.push(b"\n");
+                    return Some(Request::Send);
+                }
+                Backspace => sudo.password.pop(),
+                Char(c) if !sudo.failed => sudo.password.push(c),
+                _ => {}
+            }
+            return None;
+        }
         let code = match code {
             Char('w' | 'k') => Up,
             Char('s' | 'j') => Down,
@@ -208,18 +279,54 @@ impl App {
                     self.output = Output::default();
                     self.failure = None;
                     self.step = None;
-                    return Some(Request::Start);
+                    if self.plan.needs_sudo(&self.catalog) {
+                        self.sudo = Some(SudoDialog::new(Then::Step(0), true));
+                        return Some(Request::Validate);
+                    }
+                    return Some(Request::Step(0));
                 }
                 Enter | Esc => self.screen = Screen::Preview,
                 _ => {}
             },
             Screen::Run => {
                 if !self.running && matches!(code, Enter | Esc) {
-                    return Some(Request::Refresh);
+                    return Some(self.check());
                 }
             }
         }
         None
+    }
+
+    /// Leaves the sudo dialog, as escape leaves every screen: before a run, back to the preview;
+    /// during one, its end; before the first check, out of the TUI; before a later one, back to the
+    /// finished run.
+    fn leave_sudo(&mut self) -> Option<Request> {
+        let sudo = self.sudo.take()?;
+        match sudo.then {
+            Then::Check if !self.checked => return Some(Request::Quit),
+            Then::Check => {}
+            Then::Step(0) => {
+                self.running = false;
+                self.screen = Screen::Preview;
+            }
+            Then::Step(_) => {
+                let message = "sudo: left without the credential".to_string();
+                self.output.note(&format!("\x1b[31m{message}\x1b[0m"));
+                self.failure = Some(message);
+                self.running = false;
+            }
+        }
+        Some(Request::Cancel)
+    }
+
+    /// The check after a run, through the sudo dialog where a present script is super.
+    fn check(&mut self) -> Request {
+        if self.catalog.super_present() {
+            self.sudo = Some(SudoDialog::new(Then::Check, false));
+            Request::Validate
+        } else {
+            Request::Check
+        }
     }
 
     /// How far the preview scrolls: until its last line sits at the body's bottom.
@@ -228,8 +335,8 @@ impl App {
         lines.saturating_sub(self.body_rows)
     }
 
-    /// Applies a run's event.
-    pub(crate) fn event(&mut self, event: RunEvent) {
+    /// Applies a run's or sudo's event, returning what the loop must do next.
+    pub(crate) fn event(&mut self, event: RunEvent) -> Option<Request> {
         match event {
             RunEvent::Begin { step } => {
                 self.step = Some(step);
@@ -246,15 +353,52 @@ impl App {
             RunEvent::Fail { message } => {
                 self.output.note(&format!("\x1b[31m{message}\x1b[0m"));
                 self.failure = Some(message);
+                self.running = false;
             }
-            RunEvent::Finish => self.running = false,
+            RunEvent::Done { step } => return self.next(step + 1),
+            RunEvent::SudoOutput { bytes } => {
+                if let Some(sudo) = self.sudo.as_mut() {
+                    sudo.terminal.push(&bytes);
+                    sudo.shown = true;
+                }
+            }
+            RunEvent::SudoExit { ok } => {
+                let sudo = self.sudo.as_mut()?;
+                if !ok {
+                    sudo.failed = true;
+                    sudo.shown = true;
+                    return None;
+                }
+                let then = sudo.then;
+                self.sudo = None;
+                return Some(match then {
+                    Then::Step(step) => Request::Step(step),
+                    Then::Check => Request::Check,
+                });
+            }
         }
+        None
+    }
+
+    /// What follows a step: the next, its credential refreshed first where the plan needs sudo, or
+    /// the run's end.
+    fn next(&mut self, step: usize) -> Option<Request> {
+        if step >= self.plan.steps.len() {
+            self.running = false;
+            return None;
+        }
+        if self.plan.needs_sudo(&self.catalog) {
+            self.sudo = Some(SudoDialog::new(Then::Step(step), false));
+            return Some(Request::Validate);
+        }
+        Some(Request::Step(step))
     }
 
     /// Takes every component's state afresh, clearing the marks and the list's order.
     pub(crate) fn refresh(&mut self, added: Vec<bool>) {
         let current = self.current();
         self.added = added;
+        self.checked = true;
         self.adds.clear();
         self.removes.clear();
         self.order = self.catalog.display_order(&self.added);
@@ -295,30 +439,47 @@ impl App {
     }
 }
 
-/// Runs the TUI until the user leaves it, in the look given or the one the terminal gets.
-pub(crate) fn run(catalog: Catalog, runner: Runner, added: Vec<bool>, look: Option<Look>) -> Result<ExitCode> {
+/// Runs the TUI until the user leaves it, in the look given or the one the terminal gets. Where a
+/// present script is super, the first check waits on the sudo dialog.
+pub(crate) fn run(catalog: Catalog, runner: Runner, look: Option<Look>) -> Result<ExitCode> {
+    let (mut app, first) = if catalog.super_present() {
+        (App::unchecked(catalog), Some(Request::Validate))
+    } else {
+        let added = runner.present_all(&catalog)?;
+        (App::new(catalog, added), None)
+    };
     let mut terminal = ratatui::init();
     let picker = tui::icon::picker();
     let look = look.unwrap_or_else(|| tui::look::detect(&picker));
-    let icons = Icons::load(&catalog, &picker, tui::icon::background(&picker), look);
-    let mut app = App::new(catalog, added);
+    let icons = Icons::load(&app.catalog, &picker, tui::icon::background(&picker), look);
     app.look = look;
-    let outcome = drive(&mut terminal, app, &runner, &icons);
+    let outcome = drive(&mut terminal, app, &runner, &icons, first);
     ratatui::restore();
     outcome
 }
 
-/// The loop: draw, take the run's events, then a key.
+/// The loop: take the run's and sudo's events, draw, then a key.
 fn drive(
     terminal: &mut ratatui::DefaultTerminal,
     mut app: App,
     runner: &Runner,
     icons: &Icons,
+    first: Option<Request>,
 ) -> Result<ExitCode> {
     let (sender, events) = mpsc::channel();
+    let mut validation: Option<Validation> = None;
+    if let Some(request) = first
+        && let Some(code) = serve(request, &mut app, runner, &sender, &mut validation)?
+    {
+        return Ok(code);
+    }
     loop {
         while let Ok(event) = events.try_recv() {
-            app.event(event);
+            if let Some(request) = app.event(event)
+                && let Some(code) = serve(request, &mut app, runner, &sender, &mut validation)?
+            {
+                return Ok(code);
+            }
         }
         let area = terminal.draw(|frame| tui::view::draw(frame, &app, icons)).context(TerminalSnafu)?.area;
         let [_, body, _] = tui::view::regions(area);
@@ -334,16 +495,40 @@ fn drive(
         if kind != r::KeyEventKind::Press {
             continue;
         }
-        match app.key(code) {
-            Some(Request::Quit) => return Ok(ExitCode::SUCCESS),
-            Some(Request::Start) => {
-                runner.spawn_plan(&app.catalog, &app.plan, sender.clone());
-            }
-            Some(Request::Refresh) => {
-                let added = runner.present_all(&app.catalog)?;
-                app.refresh(added);
-            }
-            None => {}
+        if let Some(request) = app.key(code)
+            && let Some(code) = serve(request, &mut app, runner, &sender, &mut validation)?
+        {
+            return Ok(code);
         }
     }
+}
+
+/// Does what a request asks; a quit returns the exit code.
+fn serve(
+    request: Request,
+    app: &mut App,
+    runner: &Runner,
+    sender: &mpsc::Sender<RunEvent>,
+    validation: &mut Option<Validation>,
+) -> Result<Option<ExitCode>> {
+    match request {
+        Request::Quit => return Ok(Some(ExitCode::SUCCESS)),
+        Request::Step(i) => {
+            if let Some(&Step { action, component }) = app.plan.steps.get(i) {
+                runner.spawn_step(&app.catalog.components[component], i, action, sender.clone());
+            }
+        }
+        Request::Check => {
+            let added = runner.present_all(&app.catalog)?;
+            app.refresh(added);
+        }
+        Request::Validate => *validation = Some(Validation::start(OsStr::new(sudo::SUDO), sender.clone())),
+        Request::Send => {
+            if let (Some(validation), Some(sudo)) = (validation.as_mut(), app.sudo.as_mut()) {
+                validation.send(&sudo.password.take());
+            }
+        }
+        Request::Cancel => *validation = None,
+    }
+    Ok(None)
 }

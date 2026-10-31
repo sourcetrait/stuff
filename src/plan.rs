@@ -67,4 +67,13 @@ impl Plan {
     pub(crate) fn is_empty(&self) -> bool {
         self.steps.is_empty()
     }
+
+    /// Whether the plan needs sudo: a step's script is super, or its component's present script,
+    /// which runs again after the step.
+    pub(crate) fn needs_sudo(&self, catalog: &Catalog) -> bool {
+        self.steps.iter().any(|step| {
+            let supers = catalog.components[step.component].supers;
+            supers.of(step.action.script()) || supers.present
+        })
+    }
 }

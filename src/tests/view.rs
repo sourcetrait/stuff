@@ -37,6 +37,38 @@ fn the_list_shows_the_title_the_cards_and_the_legend() {
 }
 
 #[test]
+fn the_sudo_dialog_shows_its_title_and_sudo_s_exchange() {
+    let mut app = App::new(catalog(), vec![false; 5]);
+    let mut sudo = SudoDialog::new(Then::Step(0), true);
+    sudo.terminal.push(b"\nWe trust you have received the usual lecture.\n\n[sudo] password for test: ");
+    app.sudo = Some(sudo);
+    let buffer = render(&app, 80, 24);
+    let (title_x, title_y) = find(&buffer, " [sudo] ").expect("the title");
+    let (_, prompt_y) = find(&buffer, "[sudo] password for test:").expect("the prompt");
+    assert!(prompt_y > title_y + 1, "the prompt sits in the mini terminal, under the title");
+    assert_eq!(buffer[(title_x + 1, title_y)].fg, tui::view::YELLOW);
+    assert!(find(&buffer, "usual lecture").is_some());
+}
+
+#[test]
+fn the_sudo_dialog_fits_a_small_screen() {
+    let mut app = App::new(catalog(), vec![false; 5]);
+    let mut sudo = SudoDialog::new(Then::Step(0), true);
+    sudo.terminal.push(b"alpha\nbravo\ncharlie\ndelta\necho\nfoxtrot\n[sudo] password for test: ");
+    app.sudo = Some(sudo);
+    let buffer = render(&app, 40, 10);
+    assert!(find(&buffer, "[sudo] password").is_some(), "the newest line shows");
+    assert!(find(&buffer, "alpha").is_none(), "the oldest scroll away");
+}
+
+#[test]
+fn an_unseen_refresh_draws_no_dialog() {
+    let mut app = App::new(catalog(), vec![false; 5]);
+    app.sudo = Some(SudoDialog::new(Then::Step(1), false));
+    assert!(find(&render(&app, 80, 24), "[sudo]").is_none());
+}
+
+#[test]
 fn a_subcomponent_is_indented_under_its_parent() {
     let app = App::new(catalog(), vec![false; 5]);
     let buffer = render(&app, 80, 24);

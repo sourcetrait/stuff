@@ -60,17 +60,23 @@ impl Output {
         }
     }
 
+    /// Every line, the open one last even when it holds nothing, as a terminal's screen shows them.
+    pub(crate) fn screen(&self) -> &[Vec<u8>] {
+        &self.lines
+    }
+
     /// The last `rows` lines, their ANSI colors kept.
     pub(crate) fn tail(&self, rows: usize) -> r::Text<'static> {
         let lines = self.lines();
         let start = lines.len().saturating_sub(rows);
-        let styled: Vec<r::Line<'static>> = lines[start..]
-            .iter()
-            .map(|bytes| match bytes.into_text() {
-                Ok(text) => text.lines.into_iter().next().unwrap_or_default(),
-                Err(_) => r::Line::raw(String::from_utf8_lossy(bytes).into_owned()),
-            })
-            .collect();
-        r::Text::from(styled)
+        r::Text::from(lines[start..].iter().map(|bytes| styled(bytes)).collect::<Vec<_>>())
+    }
+}
+
+/// A line's bytes as a styled line, its ANSI colors kept.
+pub(crate) fn styled(bytes: &[u8]) -> r::Line<'static> {
+    match bytes.into_text() {
+        Ok(text) => text.lines.into_iter().next().unwrap_or_default(),
+        Err(_) => r::Line::raw(String::from_utf8_lossy(bytes).into_owned()),
     }
 }

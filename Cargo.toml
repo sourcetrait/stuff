@@ -22,6 +22,7 @@ serde = { version = "1", features = ["derive"] }
 snafu = "0.8"
 sourcetrait_common = { path = "../common/crates/sourcetrait_common", version = ">=0.0.0-0", default-features = false, features = ["testing"] }
 toml = "1"
+zeroize = "1"
 
 [package]
 name = "sourcetrait_stuff"
@@ -49,3 +50,4 @@ serde.workspace = true
 snafu.workspace = true
 sourcetrait_common.workspace = true
 toml.workspace = true
+zeroize.workspace = true

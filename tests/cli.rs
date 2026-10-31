@@ -15,10 +15,10 @@ const PRESENT: &str = "def main [] {
 }
 ";
 
-/// add.nu writing the marker, and the marker's text from its own config.toml.
+/// add.nu writing the marker, and the marker's text from its own component.toml.
 const ADD: &str = "def main [] {
     let marker = ($env.HOME | path join $'($env.COMPONENT_ID | str replace --all \"/\" \"-\").added')
-    let note = (open ($env.COMPONENT_DIR | path join config.toml) | get note? | default 'none')
+    let note = (open ($env.COMPONENT_DIR | path join component.toml) | get note? | default 'none')
     print $'adding ($env.COMPONENT_ID) from ($env.STUFF_DIR | path basename)'
     $note | save --force $marker
 }
@@ -45,7 +45,7 @@ fn write(path: &Path, text: &str) {
 
 fn component(dir: &Path, id: &str, config: &str, add: &str) {
     let path = dir.join("component").join(id);
-    write(&path.join("config.toml"), config);
+    write(&path.join("component.toml"), config);
     write(&path.join("present.nu"), PRESENT);
     write(&path.join("add.nu"), add);
     write(&path.join("remove.nu"), REMOVE);
@@ -56,7 +56,7 @@ fn fixture(root: &Path) -> (std::path::PathBuf, std::path::PathBuf) {
     let dir = root.join("stuff");
     let home = root.join("home");
     std::fs::create_dir_all(&home).expect("a home");
-    write(&dir.join("config.toml"), "title = \"Test\"\n");
+    write(&dir.join("stuff.toml"), "title = \"Test\"\n");
     component(&dir, "base", "title = \"Base\"\ndescription = \"the base\"\nnote = \"from base\"\n", ADD);
     component(&dir, "base/extra", "title = \"Extra\"\ndescription = \"an extra\"\n", ADD);
     component(&dir, "other", "title = \"Other\"\ndepends = [\"base\"]\n", ADD);
@@ -90,6 +90,52 @@ fn a_directory_without_stuff_is_unknown_stuff() {
     let refused = stuff(&home, &home, &["add"]);
     assert!(!refused.status.success());
     assert!(stderr(&refused).contains("what stuff?"), "{}", stderr(&refused));
+}
+
+#[tested]
+fn a_directory_holding_config_toml_is_unknown_stuff() {
+    let t = testing::test!({ .using_temp_dir() });
+    let (dir, home) = fixture(t.temp_dir());
+    std::fs::rename(dir.join("stuff.toml"), dir.join("config.toml")).expect("renamed");
+    let refused = stuff(&dir, &home, &["add"]);
+    assert!(!refused.status.success());
+    assert!(stderr(&refused).contains("what stuff?"), "{}", stderr(&refused));
+}
+
+#[tested]
+fn a_subdirectory_without_component_toml_is_no_component() {
+    let t = testing::test!({ .using_temp_dir() });
+    let (dir, home) = fixture(t.temp_dir());
+    write(&dir.join("component/base/data/config.toml"), "title = \"Data\"\n");
+    let listed = stuff(&dir, &home, &["add"]);
+    assert!(listed.status.success(), "{}", stderr(&listed));
+    assert!(!stdout(&listed).contains("base/data"), "{}", stdout(&listed));
+}
+
+#[tested]
+fn super_present_scripts_run_after_the_rest_one_at_a_time() {
+    let t = testing::test!({ .using_temp_dir() });
+    let (dir, home) = fixture(t.temp_dir());
+    let log = home.join("present.log");
+    let logged = |id: &str| {
+        format!(
+            "def main [] {{
+    \"start {id}\\n\" | save --append ($env.HOME | path join present.log)
+    sleep 200ms
+    \"end {id}\\n\" | save --append ($env.HOME | path join present.log)
+    exit 1
+}}
+"
+        )
+    };
+    for id in ["sudo-one", "sudo-two"] {
+        component(&dir, id, &format!("title = \"{id}\"\n\n[present]\nsuper = true\n"), ADD);
+        write(&dir.join("component").join(id).join("present.nu"), &logged(id));
+    }
+    let listed = stuff(&dir, &home, &["add"]);
+    assert!(listed.status.success(), "{}", stderr(&listed));
+    let order = std::fs::read_to_string(&log).expect("the log");
+    assert_eq!(order, "start sudo-one\nend sudo-one\nstart sudo-two\nend sudo-two\n", "{order}");
 }
 
 #[tested]

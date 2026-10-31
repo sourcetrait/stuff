@@ -65,3 +65,20 @@ its scroll, the rule's width mattering only to the drawing.
 
 The dialog draws over the preview after a clear, so the preview stays as its
 backdrop.
+
+## const YELLOW
+
+The sudo dialog's highlight, as purple is every other's.
+
+## const SUDO_TERMINAL
+
+70 by 16 cells, sudo's longest normal exchange measured in a sysbox container:
+its first-use lecture's ten lines, the widest 66 columns, then a prompt a try
+and "Sorry, try again." after each wrong one, and "sudo: 3 incorrect password
+attempts" when all three fail.
+
+## fn sudo_dialog
+
+The newest lines show, the oldest scrolling away, and the dialog shrinks with
+a smaller screen. A reversed cell after sudo's last line stands for the
+terminal's cursor while sudo waits; the password never shows.

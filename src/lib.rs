@@ -7,6 +7,7 @@ pub(crate) mod error;
 pub(crate) mod plan;
 pub(crate) mod run;
 pub(crate) mod runner;
+pub(crate) mod sudo;
 pub(crate) mod tui {
     pub(crate) mod app;
     pub(crate) mod frame;
@@ -30,21 +31,26 @@ pub(crate) mod r {
 pub(crate) use crate::{
     catalog::{Catalog, Component},
     cli::{Cli, CliActionKind},
-    config::{ComponentConfig, ComponentConfigToml, StuffConfig, StuffConfigToml},
+    config::{ComponentConfig, ComponentConfigToml, StuffConfig, StuffConfigToml, Supers},
     error::{
         CatalogResult, GraphSnafu, LayoutSnafu, ParseSnafu, ReadSnafu, RunnerResult, ScriptSnafu,
         SpawnSnafu, TerminalSnafu, UnknownSnafu, UnknownStuffSnafu,
     },
     plan::{Plan, Step, StepAction},
     runner::{RunEvent, Runner, Script},
+    sudo::{Secret, Validation},
     tui::{
-        app::{App, Button, Look, Mark, Screen},
+        app::{App, Button, Look, Mark, Screen, SudoDialog},
         icon::Icons,
         output::Output,
     },
 };
 #[cfg(test)]
-pub(crate) use crate::{catalog::ComponentSpec, error::CatalogErrorKind, tui::app::Request};
+pub(crate) use crate::{
+    catalog::ComponentSpec,
+    error::CatalogErrorKind,
+    tui::app::{Request, Then},
+};
 
 pub(crate) use ansi_to_tui::IntoText;
 pub(crate) use snafu::ResultExt;
@@ -68,5 +74,6 @@ mod tests {
     mod catalog;
     mod output;
     mod plan;
+    mod sudo;
     mod view;
 }

@@ -9,9 +9,11 @@ yet, so it is allowed as dead code.
 
 ### fn command
 
-stdin is null: a script cannot prompt, so a run never waits on input the TUI
-cannot give it. The script runs from its component's directory, so a
-relative path in it is the component's own.
+stdin is null: a script cannot read input, so a run never waits on input the
+TUI cannot give it. sudo reads a password from the terminal device, not stdin,
+so a super script's `sudo -v` still asks on the command line; in the TUI the
+credential is cached first. The script runs from its component's directory, so
+a relative path in it is the component's own.
 
 ### fn present
 
@@ -21,8 +23,15 @@ either.
 
 ### fn present_all
 
-Each present script runs on a thread of its own: nu's start, its config included,
-dominates the time, and the checks are independent.
+Each plain present script runs on a thread of its own: nu's start, its config
+included, dominates the time, and the checks are independent. The super ones
+run after them, one at a time, so on the command line only the first one's
+`sudo -v` asks and the rest find the credential cached.
+
+### fn spawn_step
+
+One step a thread, the TUI choosing the next once one is done, so it can
+refresh the credential between steps.
 
 ### fn step_piped
 

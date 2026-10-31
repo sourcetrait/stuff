@@ -32,8 +32,13 @@ subcomponent always stays under its parent.
 Kahn's algorithm over the same edges; whatever is left pending is named in
 the error.
 
+### fn super_present
+
+Every present script runs when the TUI opens, so one super present script
+makes the first check wait on the sudo dialog.
+
 ## fn collect
 
-A subdirectory is a subcomponent only when it holds a config.toml, so a
+A subdirectory is a subcomponent only when it holds a component.toml, so a
 component may keep other directories of its own for its scripts. Siblings
 are taken in name order, the order the list and the CLI show them.

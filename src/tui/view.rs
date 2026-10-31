@@ -12,6 +12,11 @@ const ADDED: r::Color = r::Color::Rgb(90, 150, 255);
 const TO_ADD: r::Color = r::Color::Rgb(70, 200, 110);
 /// The color of a component to remove: red, its title's in the simple look and the preview's rule.
 const TO_REMOVE: r::Color = r::Color::Rgb(235, 85, 85);
+/// The sudo dialog's highlight: its border's and its title's.
+pub(crate) const YELLOW: r::Color = r::Color::Rgb(240, 200, 60);
+/// The sudo dialog's mini terminal, its cells inside its border: sudo's longest normal exchange in
+/// sysbox, its first-use lecture and three tries.
+pub(crate) const SUDO_TERMINAL: r::Size = r::Size { width: 70, height: 16 };
 /// The list's legend.
 pub(crate) const LEGEND_SELECT: &str = "<< [esc]     [w][a][s][d] [space]     [enter] >>";
 /// The preview's legend.
@@ -48,6 +53,9 @@ pub(crate) fn draw(frame: &mut ratatui::Frame, app: &App, icons: &Icons) {
         }
         Screen::Run => run(frame, body, app),
     }
+    if let Some(sudo) = app.sudo.as_ref().filter(|sudo| sudo.shown) {
+        sudo_dialog(frame, frame.area(), app.look, sudo);
+    }
     legend(frame, foot, app);
 }
 
@@ -75,6 +83,9 @@ fn header(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
 
 /// The component list: a column of cards, the cursor's framed in purple.
 fn select(frame: &mut ratatui::Frame, area: r::Rect, app: &App, icons: &Icons) {
+    if !app.checked {
+        return;
+    }
     if app.order.is_empty() {
         frame.render_widget(r::Paragraph::new(r::Line::styled("no components", r::Style::new().fg(QUIET))), area);
         return;
@@ -157,6 +168,36 @@ fn border(frame: &mut ratatui::Frame, area: r::Rect, look: Look, color: r::Color
     }
     .border_style(r::Style::new().fg(color));
     frame.render_widget(if let Some(title) = title { block.title(title) } else { block }, area);
+}
+
+/// The sudo dialog, centered over the screen and highlighted yellow, its title `[sudo]` in yellow:
+/// a bordered mini terminal holding sudo's exchange, a cursor at its end while sudo waits.
+fn sudo_dialog(frame: &mut ratatui::Frame, area: r::Rect, look: Look, sudo: &SudoDialog) {
+    // The mini terminal's border and the dialog's lie around its cells.
+    let width = (SUDO_TERMINAL.width + 4).min(area.width);
+    let height = (SUDO_TERMINAL.height + 4).min(area.height);
+    let popup = r::Rect::new(
+        area.x + (area.width - width) / 2,
+        area.y + (area.height - height) / 2,
+        width,
+        height,
+    );
+    frame.render_widget(r::Clear, popup);
+    border(frame, popup, look, YELLOW, None);
+    let title = r::Line::styled(" [sudo] ", r::Style::new().fg(YELLOW).add_modifier(r::Modifier::BOLD));
+    frame.render_widget(title, r::Rect { x: popup.x + 2, height: 1, width: popup.width.saturating_sub(4), ..popup });
+    let terminal_area = popup.inner(r::Margin::new(1, 1));
+    border(frame, terminal_area, look, QUIET, None);
+    let inner = terminal_area.inner(r::Margin::new(1, 1));
+    let mut lines: Vec<r::Line<'static>> = sudo.terminal.screen().iter().map(|bytes| tui::output::styled(bytes)).collect();
+    if lines.is_empty() {
+        lines.push(r::Line::default());
+    }
+    if !sudo.failed && let Some(open) = lines.last_mut() {
+        open.push_span(r::Span::styled(" ", r::Style::new().add_modifier(r::Modifier::REVERSED)));
+    }
+    let start = lines.len().saturating_sub(usize::from(inner.height));
+    frame.render_widget(r::Paragraph::new(lines.split_off(start)), inner);
 }
 
 /// The preview, scrolled by the app's scroll.
@@ -260,6 +301,8 @@ fn run(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
 /// The legend, quiet and centered at the bottom.
 fn legend(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
     let text = match app.screen {
+        _ if app.sudo.as_ref().is_some_and(|sudo| sudo.shown) => LEGEND_STEP,
+        _ if !app.checked => "",
         Screen::Select => LEGEND_SELECT,
         Screen::Preview => LEGEND_PREVIEW,
         Screen::Run if app.running => "",

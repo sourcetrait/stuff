@@ -4,14 +4,16 @@ use crate::*;
 
 /// The directory under the stuff directory that holds the components.
 pub(crate) const COMPONENT_DIR: &str = "component";
-/// The configuration file the directory and each component carry.
-pub(crate) const CONFIG_FILE: &str = "config.toml";
+/// The stuff directory's configuration file.
+pub(crate) const STUFF_FILE: &str = "stuff.toml";
+/// Each component's configuration file.
+pub(crate) const COMPONENT_FILE: &str = "component.toml";
 /// The icon the stuff directory may carry.
 pub(crate) const LOGO_FILE: &str = "logo.png";
 
-/// Whether a path is a stuff directory: a directory holding its config.toml.
+/// Whether a path is a stuff directory: a directory holding its stuff.toml.
 pub(crate) fn holds_stuff(path: &Path) -> bool {
-    path.join(CONFIG_FILE).is_file()
+    path.join(STUFF_FILE).is_file()
 }
 
 /// A component as found, its dependencies still names.
@@ -46,6 +48,8 @@ pub(crate) struct Component {
     pub(crate) depth: usize,
     /// Its directory.
     pub(crate) dir: PathBuf,
+    /// Which of its scripts are super.
+    pub(crate) supers: Supers,
 }
 
 /// The stuff directory: its configuration and its components in tree order.
@@ -62,10 +66,10 @@ pub(crate) struct Catalog {
 }
 
 impl Catalog {
-    /// Loads a stuff directory: its config.toml and every component under it.
+    /// Loads a stuff directory: its stuff.toml and every component under it.
     pub(crate) fn load(dir: &Path) -> CatalogResult<Self> {
         let dir = std::fs::canonicalize(dir).context(ReadSnafu { path: display(dir) })?;
-        let config: StuffConfigToml = read_toml(&dir.join(CONFIG_FILE))?;
+        let config: StuffConfigToml = read_toml(&dir.join(STUFF_FILE))?;
         let icon = Some(dir.join(LOGO_FILE)).filter(|path| path.is_file());
         let mut specs = Vec::new();
         let root = dir.join(COMPONENT_DIR);
@@ -114,6 +118,7 @@ impl Catalog {
                 depends,
                 depth,
                 dir: spec.dir.clone(),
+                supers: spec.config.supers,
             });
         }
         for i in 0..components.len() {
@@ -168,6 +173,11 @@ impl Catalog {
         let mut order = Vec::with_capacity(self.components.len());
         self.order_siblings(&roots, added, &mut order);
         order
+    }
+
+    /// Whether any component's present script is super, so checking the components needs sudo.
+    pub(crate) fn super_present(&self) -> bool {
+        self.components.iter().any(|c| c.supers.present)
     }
 
     /// The components named, by index.
@@ -254,7 +264,7 @@ fn collect(
         .collect::<std::io::Result<Vec<_>>>()
         .context(ReadSnafu { path: display(dir) })?;
     paths.sort();
-    for path in paths.into_iter().filter(|p| p.is_dir() && p.join(CONFIG_FILE).is_file()) {
+    for path in paths.into_iter().filter(|p| p.is_dir() && p.join(COMPONENT_FILE).is_file()) {
         let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         let id = if prefix.is_empty() { name } else { format!("{prefix}/{name}") };
         for script in [Script::Present, Script::Add, Script::Remove] {
@@ -263,7 +273,7 @@ fn collect(
                     .fail();
             }
         }
-        let config_path = path.join(CONFIG_FILE);
+        let config_path = path.join(COMPONENT_FILE);
         let toml: ComponentConfigToml = read_toml(&config_path)?;
         let config = ComponentConfig::try_from(toml)
             .map_err(|reason| LayoutSnafu { path: display(&config_path), reason }.build())?;

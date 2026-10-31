@@ -17,6 +17,8 @@ used by the unit tests alone; in the main hub they warn as unused imports.
 
 ## Dependencies
 
+zeroize clears the sudo password typed into the dialog once it is dropped.
+
 ratatui-image takes its `crossterm` feature alone, its defaults left off for
 the `image` formats and the chafa encoder they would add; it finds the
 terminal's graphics protocol and draws images through it. `image` is declared

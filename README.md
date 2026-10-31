@@ -17,7 +17,7 @@ stuff <dir> remove <components>...  removes them, with what depends on them
 stuff --probe                       what the terminal can draw
 ```
 
-The source is a stuff directory, one holding a `config.toml`.
+The source is a stuff directory, one holding a `stuff.toml`.
 
 In the TUI, `w` `a` `s` `d` move, as do helix's `k` `h` `j` `l` and the
 arrows; space marks a component to add or remove, enter goes on, and escape
@@ -38,10 +38,11 @@ The stuff directory
 
 ```
 <dir>/
-  config.toml           title = "..."
+  stuff.toml            title = "..."
   logo.png              the icon, an image with transparency
   component/<component>/
-    config.toml         title, description (80 characters at most), depends
+    component.toml      title, description (80 characters at most), depends,
+                        and [present], [add], [remove], each with super
     present.nu          exits 0 when the component is added, 1 when not
     add.nu              adds it
     remove.nu           removes it
@@ -50,7 +51,7 @@ The stuff directory
 
 A component is named by its path under `component/`, `rust/nightly`. A
 subcomponent depends on its parent, and `depends` names any other components
-it needs. A component's `config.toml` may hold keys of its own for its
+it needs. A component's `component.toml` may hold keys of its own for its
 scripts to read.
 
 The stuff directory's `logo.png`, else the sourcetrait logo, heads the TUI in
@@ -61,6 +62,15 @@ directory with your own nushell `env.nu` and `config.nu`, and with
 `STUFF_DIR`, `COMPONENT_ID`, and `COMPONENT_DIR` set. After an add or a
 remove, `present.nu` runs again to confirm it, and a run stops at the first
 failure.
+
+A script that needs root says so in its block, `[add]` with `super = true`.
+It still runs as you, in your environment: shortly before its one command
+that needs root it calls `sudo -v`, then puts sudo in front of that command,
+`sudo npm -g install ...`. On the command line that `sudo -v` asks on the
+terminal. In the TUI, a run that needs sudo asks first, in a yellow `[sudo]`
+dialog holding sudo's own exchange, and Stuff's `sudo -v` refreshes the
+credential before each step; with a super `present.nu` the dialog comes
+before the list, every present script running as the TUI opens.
 
 License (AGPL3)
 --------------------------------------------------------------------------------

@@ -31,7 +31,7 @@ impl Script {
     }
 }
 
-/// What a run tells the TUI as it goes.
+/// What a run and sudo tell the TUI as they go.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RunEvent {
     /// A step begins, by its index in the plan.
@@ -40,8 +40,12 @@ pub(crate) enum RunEvent {
     Output { bytes: Vec<u8> },
     /// A step failed and the run stopped.
     Fail { message: String },
-    /// The run ended.
-    Finish,
+    /// A step ended well, by its index in the plan.
+    Done { step: usize },
+    /// sudo wrote its prompt or a message.
+    SudoOutput { bytes: Vec<u8> },
+    /// sudo ended: whether the credential is cached.
+    SudoExit { ok: bool },
 }
 
 /// The kind of a [`RunEvent`].
@@ -51,7 +55,9 @@ pub(crate) enum RunEventKind {
     Begin,
     Output,
     Fail,
-    Finish,
+    Done,
+    SudoOutput,
+    SudoExit,
 }
 
 impl RunEvent {
@@ -62,7 +68,9 @@ impl RunEvent {
             Self::Begin { .. } => RunEventKind::Begin,
             Self::Output { .. } => RunEventKind::Output,
             Self::Fail { .. } => RunEventKind::Fail,
-            Self::Finish => RunEventKind::Finish,
+            Self::Done { .. } => RunEventKind::Done,
+            Self::SudoOutput { .. } => RunEventKind::SudoOutput,
+            Self::SudoExit { .. } => RunEventKind::SudoExit,
         }
     }
 }
@@ -124,16 +132,28 @@ impl Runner {
         }
     }
 
-    /// Every component's present script, run at once.
+    /// Every component's present script: the plain ones at once, then the super ones one at a
+    /// time, so only the first can ask for the password.
     pub(crate) fn present_all(&self, catalog: &Catalog) -> RunnerResult<Vec<bool>> {
-        thread::scope(|scope| {
-            let checks: Vec<_> = catalog
-                .components
-                .iter()
-                .map(|component| scope.spawn(move || self.present(component)))
-                .collect();
-            checks.into_iter().map(|check| check.join().expect("a present check panicked")).collect()
-        })
+        let components = &catalog.components;
+        let (supers, plain): (Vec<usize>, Vec<usize>) =
+            (0..components.len()).partition(|&i| components[i].supers.present);
+        let checks: Vec<(usize, RunnerResult<bool>)> = thread::scope(|scope| {
+            let running: Vec<_> =
+                plain.iter().map(|&i| (i, scope.spawn(move || self.present(&components[i])))).collect();
+            running
+                .into_iter()
+                .map(|(i, check)| (i, check.join().expect("a present check panicked")))
+                .collect()
+        });
+        let mut added = vec![false; components.len()];
+        for (i, check) in checks {
+            added[i] = check?;
+        }
+        for i in supers {
+            added[i] = self.present(&components[i])?;
+        }
+        Ok(added)
     }
 
     /// Runs a step with its output passed through to this process's own.
@@ -181,26 +201,23 @@ impl Runner {
         self.settle(component, action, status)
     }
 
-    /// Runs a plan on a thread of its own, its progress sent to the TUI.
-    pub(crate) fn spawn_plan(
+    /// Runs one step on a thread of its own, its progress sent to the TUI.
+    pub(crate) fn spawn_step(
         &self,
-        catalog: &Catalog,
-        plan: &Plan,
+        component: &Component,
+        step: usize,
+        action: StepAction,
         events: mpsc::Sender<RunEvent>,
     ) -> thread::JoinHandle<()> {
         let runner = self.clone();
-        let catalog = catalog.clone();
-        let plan = plan.clone();
+        let component = component.clone();
         thread::spawn(move || {
-            for (step, &Step { action, component }) in plan.steps.iter().enumerate() {
-                let _ = events.send(RunEvent::Begin { step });
-                let result = runner.step_piped(&catalog.components[component], action, &events);
-                if let Err(error) = result {
-                    let _ = events.send(RunEvent::Fail { message: error.to_string() });
-                    break;
-                }
-            }
-            let _ = events.send(RunEvent::Finish);
+            let _ = events.send(RunEvent::Begin { step });
+            let event = match runner.step_piped(&component, action, &events) {
+                Ok(()) => RunEvent::Done { step },
+                Err(error) => RunEvent::Fail { message: error.to_string() },
+            };
+            let _ = events.send(event);
         })
     }
 
@@ -229,13 +246,22 @@ impl Runner {
 }
 
 /// Sends a stream's bytes to the TUI until it closes.
-fn forward(mut stream: Box<dyn Read + Send>, events: &mpsc::Sender<RunEvent>) {
+fn forward(stream: Box<dyn Read + Send>, events: &mpsc::Sender<RunEvent>) {
+    forward_as(stream, events, |bytes| RunEvent::Output { bytes });
+}
+
+/// Sends a stream's bytes to the TUI as the event given, until it closes.
+pub(crate) fn forward_as(
+    mut stream: Box<dyn Read + Send>,
+    events: &mpsc::Sender<RunEvent>,
+    event: fn(Vec<u8>) -> RunEvent,
+) {
     let mut buffer = [0u8; 4096];
     loop {
         match stream.read(&mut buffer) {
             Ok(0) | Err(_) => break,
             Ok(count) => {
-                if events.send(RunEvent::Output { bytes: buffer[..count].to_vec() }).is_err() {
+                if events.send(event(buffer[..count].to_vec())).is_err() {
                     break;
                 }
             }

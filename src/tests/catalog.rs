@@ -8,6 +8,7 @@ pub(super) fn spec(id: &str, parent: Option<usize>, depends: &[&str]) -> Compone
             title: id.to_uppercase(),
             description: format!("the {id} component"),
             depends: depends.iter().map(|d| d.to_string()).collect(),
+            supers: Supers::default(),
         },
         parent,
         dir: PathBuf::from("/stuff/component").join(id),
@@ -15,20 +16,34 @@ pub(super) fn spec(id: &str, parent: Option<usize>, depends: &[&str]) -> Compone
 }
 
 /// git, rust with its nightly and riscv, and zed needing nightly and git.
+fn specs() -> Vec<ComponentSpec> {
+    vec![
+        spec("git", None, &[]),
+        spec("rust", None, &[]),
+        spec("rust/nightly", Some(1), &[]),
+        spec("rust/riscv", Some(1), &[]),
+        spec("zed", None, &["rust/nightly", "git"]),
+    ]
+}
+
+/// The fixture catalog.
 pub(super) fn catalog() -> Catalog {
-    Catalog::from_specs(
-        PathBuf::from("/stuff"),
-        StuffConfig { title: "Test".to_string() },
-        None,
-        vec![
-            spec("git", None, &[]),
-            spec("rust", None, &[]),
-            spec("rust/nightly", Some(1), &[]),
-            spec("rust/riscv", Some(1), &[]),
-            spec("zed", None, &["rust/nightly", "git"]),
-        ],
-    )
-    .expect("the fixture catalog")
+    catalog_with_supers("git", Supers::default())
+}
+
+/// The fixture catalog, one component's scripts marked super.
+pub(super) fn catalog_with_supers(id: &str, supers: Supers) -> Catalog {
+    let specs = specs()
+        .into_iter()
+        .map(|mut spec| {
+            if spec.id == id {
+                spec.config.supers = supers;
+            }
+            spec
+        })
+        .collect();
+    Catalog::from_specs(PathBuf::from("/stuff"), StuffConfig { title: "Test".to_string() }, None, specs)
+        .expect("the fixture catalog")
 }
 
 #[test]
@@ -92,7 +107,30 @@ fn a_description_past_eighty_characters_is_refused() {
     let toml = ComponentConfigToml {
         title: Some("Long".to_string()),
         description: Some("x".repeat(81)),
-        depends: None,
+        ..ComponentConfigToml::default()
     };
     assert!(ComponentConfig::try_from(toml).is_err());
+}
+
+#[test]
+fn an_interface_block_marks_its_script_super() {
+    let toml: ComponentConfigToml =
+        toml::from_str("title = \"Claude Code\"\n\n[add]\nsuper = true\n\n[remove]\nsuper = true\n")
+            .expect("a component.toml");
+    let config = ComponentConfig::try_from(toml).expect("a config");
+    assert_eq!(config.supers, Supers { present: false, add: true, remove: true });
+}
+
+#[test]
+fn a_script_is_plain_unless_its_block_says_super() {
+    let toml: ComponentConfigToml =
+        toml::from_str("title = \"Rust\"\n\n[present]\n\n[add]\nsuper = false\n").expect("a component.toml");
+    assert_eq!(ComponentConfig::try_from(toml).expect("a config").supers, Supers::default());
+}
+
+#[test]
+fn a_super_present_script_makes_the_check_need_sudo() {
+    assert!(!catalog().super_present());
+    let present = Supers { present: true, ..Supers::default() };
+    assert!(catalog_with_supers("rust/riscv", present).super_present());
 }

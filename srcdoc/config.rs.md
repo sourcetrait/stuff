@@ -2,9 +2,21 @@
 
 ## struct StuffConfigToml, struct ComponentConfigToml
 
-Unknown keys are allowed, against the estate's usual denial: a config.toml
+Unknown keys are allowed, against the estate's usual denial: a component.toml
 is shared with its scripts, which may keep any keys of their own there and
-read them through `COMPONENT_DIR` or `STUFF_DIR`.
+read them through `COMPONENT_DIR`, as a stuff.toml through `STUFF_DIR`.
+
+## struct InterfaceToml
+
+A script's block, `[present]`, `[add]`, or `[remove]`, takes `super`, false
+unless set. `super` is a Rust keyword, so the field is `superuser`, renamed
+for serde.
+
+## struct Supers
+
+A super script still runs as the user and calls sudo itself; the mark tells
+Stuff the credential is needed, so the TUI can ask for it in its dialog
+before the script's own sudo would ask on the terminal under the screen.
 
 ## impl TryFrom<ComponentConfigToml> for ComponentConfig
 

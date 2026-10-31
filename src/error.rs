@@ -53,7 +53,7 @@ pub enum CatalogError {
     /// A file or directory failed to read.
     #[snafu(display("reading {path}: {source}"))]
     Read { path: String, source: std::io::Error },
-    /// A config.toml failed to parse.
+    /// A stuff.toml or a component.toml failed to parse.
     #[snafu(display("parsing {path}: {source}"))]
     Parse { path: String, source: toml::de::Error },
     /// A component's files or fields break the layout.

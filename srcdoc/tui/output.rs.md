@@ -13,3 +13,8 @@ so the state spans pushes.
 
 Each line is converted from ANSI on its own; a color left open across a line
 end does not carry into the next.
+
+### fn screen
+
+The open line is kept even when empty, so the sudo dialog draws its cursor on
+the line after a password's enter.

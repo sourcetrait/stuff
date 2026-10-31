@@ -25,10 +25,10 @@ fn dispatch(cli: Cli) -> Result<ExitCode> {
     }
     let catalog = Catalog::load(&source)?;
     let runner = Runner::new(&catalog.dir);
-    let added = runner.present_all(&catalog)?;
     let Some(action) = cli.action else {
-        return tui::app::run(catalog, runner, added, cli.look);
+        return tui::app::run(catalog, runner, cli.look);
     };
+    let added = runner.present_all(&catalog)?;
     let kind = action.kind();
     if action.components().is_empty() {
         list(&catalog, &added, kind == CliActionKind::Remove);
