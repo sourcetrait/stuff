@@ -18,6 +18,8 @@ pub(crate) enum Script {
     Add,
     /// Removes the component.
     Remove,
+    /// Returns the component's health record, where the component has one.
+    Health,
 }
 
 impl Script {
@@ -27,8 +29,38 @@ impl Script {
             Self::Present => "present.nu",
             Self::Add => "add.nu",
             Self::Remove => "remove.nu",
+            Self::Health => "health.nu",
         }
     }
+}
+
+/// The nu program of a health check: health.nu sourced from its component's directory, then its
+/// record's outer shape checked; the record's form follows.
+const HEALTH: &str = "source health.nu
+let health = (main)
+let shape = ($health | describe)
+if (not ($shape | str starts-with 'record')) {
+    error make --unspanned {msg: $'health.nu returned ($shape), not record<component: path, present: oneof<bool, record>>'}
+}
+if (($health | columns | sort) != [component present]) or (($health.component | describe) != 'string') {
+    error make --unspanned {msg: $'health.nu returned ($shape), not record<component: path, present: oneof<bool, record>>'}
+}
+let present = ($health.present | describe)
+if (not ($present == 'bool' or ($present | str starts-with 'record'))) {
+    error make --unspanned {msg: $'health.nu returned present as ($present), not a bool or a record'}
+}
+";
+
+/// The form a health record is given in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HealthForm {
+    /// NUON, for the command line.
+    Nuon,
+    /// nu's expanded table, its colors kept, for the TUI's page.
+    Table {
+        /// The columns the table may take.
+        width: u16,
+    },
 }
 
 /// What a run and sudo tell the TUI as they go.
@@ -46,6 +78,8 @@ pub(crate) enum RunEvent {
     SudoOutput { bytes: Vec<u8> },
     /// sudo ended: whether the credential is cached.
     SudoExit { ok: bool },
+    /// A component's health check ended: nu's table of its record, or the failure.
+    Health { component: usize, table: std::result::Result<String, String> },
 }
 
 /// The kind of a [`RunEvent`].
@@ -58,6 +92,7 @@ pub(crate) enum RunEventKind {
     Done,
     SudoOutput,
     SudoExit,
+    Health,
 }
 
 impl RunEvent {
@@ -71,6 +106,7 @@ impl RunEvent {
             Self::Done { .. } => RunEventKind::Done,
             Self::SudoOutput { .. } => RunEventKind::SudoOutput,
             Self::SudoExit { .. } => RunEventKind::SudoExit,
+            Self::Health { .. } => RunEventKind::Health,
         }
     }
 }
@@ -96,16 +132,52 @@ impl Runner {
 
     /// The command running a component's script.
     pub(crate) fn command(&self, component: &Component, script: Script) -> Command {
+        let mut command = self.nu_for(component);
+        command.arg(component.dir.join(script.file()));
+        command
+    }
+
+    /// nu with the user's config, from a component's directory, the component's variables set.
+    fn nu_for(&self, component: &Component) -> Command {
         let mut command = Command::new(&self.nu);
         command
             .args(&self.flags)
-            .arg(component.dir.join(script.file()))
             .current_dir(&component.dir)
             .env(ENV_STUFF_DIR, &self.dir)
             .env(ENV_COMPONENT_ID, &component.id)
             .env(ENV_COMPONENT_DIR, &component.dir)
             .stdin(Stdio::null());
         command
+    }
+
+    /// A component's health record, in the form asked for.
+    pub(crate) fn health(&self, component: &Component, form: HealthForm) -> RunnerResult<String> {
+        let program = match form {
+            HealthForm::Nuon => format!("{HEALTH}$health | to nuon\n"),
+            HealthForm::Table { width } => format!(
+                "{HEALTH}$env.config.use_ansi_coloring = true\n$health | table --expand --width {width}\n"
+            ),
+        };
+        let script = Script::Health.file();
+        let output = self
+            .nu_for(component)
+            .arg("-c")
+            .arg(program)
+            .output()
+            .context(SpawnSnafu { component: &component.id, script })?;
+        if !output.status.success() {
+            return ScriptSnafu {
+                component: &component.id,
+                script,
+                reason: format!(
+                    "exited {}: {}",
+                    describe(output.status),
+                    String::from_utf8_lossy(&output.stderr).trim()
+                ),
+            }
+            .fail();
+        }
+        Ok(String::from_utf8_lossy(&output.stdout).trim_end().to_string())
     }
 
     /// Whether a component is added, as its present script reports.
@@ -199,6 +271,22 @@ impl Runner {
         })
         .context(spawn)?;
         self.settle(component, action, status)
+    }
+
+    /// Checks a component's health on a thread of its own, nu's table of it sent to the TUI.
+    pub(crate) fn spawn_health(
+        &self,
+        component: &Component,
+        index: usize,
+        width: u16,
+        events: mpsc::Sender<RunEvent>,
+    ) -> thread::JoinHandle<()> {
+        let runner = self.clone();
+        let component = component.clone();
+        thread::spawn(move || {
+            let table = runner.health(&component, HealthForm::Table { width }).map_err(|error| error.to_string());
+            let _ = events.send(RunEvent::Health { component: index, table });
+        })
     }
 
     /// Runs one step on a thread of its own, its progress sent to the TUI.

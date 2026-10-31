@@ -42,3 +42,8 @@ makes the first check wait on the sudo dialog.
 A subdirectory is a subcomponent only when it holds a component.toml, so a
 component may keep other directories of its own for its scripts. Siblings
 are taken in name order, the order the list and the CLI show them.
+
+present.nu and add.nu are required; remove.nu is not, some things not
+removing well, and a removal passes over a component without one. health.nu
+is optional too, but brings health.nutype with it, the record's type being
+its reader's only description of it.

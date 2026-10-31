@@ -14,6 +14,7 @@ stuff <dir> add                     lists the components not added
 stuff <dir> remove                  lists the components added
 stuff <dir> add <components>...     adds them, with what they depend on
 stuff <dir> remove <components>...  removes them, with what depends on them
+stuff <dir> health <components>...  their health, as NUON
 stuff --probe                       what the terminal can draw
 ```
 
@@ -22,7 +23,9 @@ The source is a stuff directory, one holding a `stuff.toml`.
 In the TUI, `w` `a` `s` `d` move, as do helix's `k` `h` `j` `l` and the
 arrows; space marks a component to add or remove, enter goes on, and escape
 or `q` goes back or quits. The preview lists what will be installed and what
-will be uninstalled, `w` and `s` scrolling a long one.
+will be uninstalled, `w` and `s` scrolling a long one. On the list, `h` opens
+the highlighted component's health where it has a `health.nu`, `[h]ealth`
+showing in the legend, so there helix's `h` moves nothing.
 
 The TUI has two looks. The fancy look, for a terminal that scales images to
 its cells (kitty's protocol or iTerm2's), draws each component with a radio
@@ -45,7 +48,9 @@ The stuff directory
                         and [present], [add], [remove], each with super
     present.nu          exits 0 when the component is added, 1 when not
     add.nu              adds it
-    remove.nu           removes it
+    remove.nu           removes it, where it can be removed
+    health.nu           returns its health record, where it has one
+    health.nutype       the record's type, beside health.nu
     <subcomponent>/     the same, to any depth
 ```
 
@@ -71,6 +76,20 @@ terminal. In the TUI, a run that needs sudo asks first, in a yellow `[sudo]`
 dialog holding sudo's own exchange, and Stuff's `sudo -v` refreshes the
 credential before each step; with a super `present.nu` the dialog comes
 before the list, every present script running as the TUI opens.
+
+A component without `remove.nu` stays: a removal that takes it removes the
+rest, then warns `[stuff] remove not supported: <component>` on stderr, or in
+the TUI's output.
+
+`health.nu`, which needs `health.nutype` beside it, reports on its component
+for user-level administration: versions, sizes, what to clear. It runs as
+you, without sudo, and returns `record<component: path, present: oneof<bool,
+record>>`, its `health.nutype` giving the present record's own fields; it
+runs `present.nu` first and returns `{component: <component>, present:
+false}` when the component isn't added. A component without `health.nu`
+reports `present.nu`'s answer alone. `stuff <dir> health` prints one
+component's record as NUON, or a record of records keyed by name for several;
+in the TUI the health page draws it as a table.
 
 License (AGPL3)
 --------------------------------------------------------------------------------

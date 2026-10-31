@@ -19,6 +19,10 @@ pub(crate) const YELLOW: r::Color = r::Color::Rgb(240, 200, 60);
 pub(crate) const SUDO_TERMINAL: r::Size = r::Size { width: 70, height: 16 };
 /// The list's legend.
 pub(crate) const LEGEND_SELECT: &str = "<< [esc]     [w][a][s][d] [space]     [enter] >>";
+/// The list's legend where the highlighted component has a health script.
+pub(crate) const LEGEND_SELECT_HEALTH: &str = "<< [esc]     [w][a][s][d] [space] [h]ealth     [enter] >>";
+/// The health page's legend.
+pub(crate) const LEGEND_HEALTH: &str = "<< [esc]     [w][s]";
 /// The preview's legend.
 pub(crate) const LEGEND_PREVIEW: &str = "<< [esc]     [w][s]     [enter] >>";
 /// The legend of the dialog and the finished run.
@@ -52,6 +56,7 @@ pub(crate) fn draw(frame: &mut ratatui::Frame, app: &App, icons: &Icons) {
             confirm(frame, frame.area(), app);
         }
         Screen::Run => run(frame, body, app),
+        Screen::Health => health_page(frame, body, app),
     }
     if let Some(sudo) = app.sudo.as_ref().filter(|sudo| sudo.shown) {
         sudo_dialog(frame, frame.area(), app.look, sudo);
@@ -298,12 +303,41 @@ fn run(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
     frame.render_widget(r::Paragraph::new(status), clip(area.x + 1, status_area.y, area.width, 1, area));
 }
 
+/// The columns a health table is drawn to: the body's, inside its insets.
+pub(crate) fn health_width(body_columns: u16) -> u16 {
+    body_columns.saturating_sub(2 * INSET).max(20)
+}
+
+/// The health page: `Health: <Title>` over nu's table of the component's record, scrolled by the
+/// page's scroll; while the check runs, a quiet note.
+fn health_page(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
+    let Some(page) = app.health.as_ref() else { return };
+    let area = area.inner(r::Margin::new(INSET, 0));
+    let [title_area, _, table_area] =
+        r::Layout::vertical([r::Constraint::Length(1), r::Constraint::Length(1), r::Constraint::Min(1)]).areas(area);
+    let title = format!("Health: {}", app.catalog.components[page.component].title);
+    frame.render_widget(r::Line::styled(title, r::Style::new().add_modifier(r::Modifier::BOLD)), title_area);
+    let text = if let Some(failure) = page.failure.as_ref() {
+        r::Text::from(
+            failure.lines().map(|line| r::Line::styled(line.to_string(), r::Style::new().fg(TO_REMOVE))).collect::<Vec<_>>(),
+        )
+    } else if let Some(table) = page.table.as_ref() {
+        table.tail(usize::MAX)
+    } else {
+        r::Text::from(r::Line::styled("checking", r::Style::new().fg(QUIET)))
+    };
+    frame.render_widget(r::Paragraph::new(text).scroll((page.scroll, 0)), table_area);
+}
+
 /// The legend, quiet and centered at the bottom.
 fn legend(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
+    let health = app.current().is_some_and(|i| app.catalog.components[i].health);
     let text = match app.screen {
         _ if app.sudo.as_ref().is_some_and(|sudo| sudo.shown) => LEGEND_STEP,
         _ if !app.checked => "",
+        Screen::Select if health => LEGEND_SELECT_HEALTH,
         Screen::Select => LEGEND_SELECT,
+        Screen::Health => LEGEND_HEALTH,
         Screen::Preview => LEGEND_PREVIEW,
         Screen::Run if app.running => "",
         _ => LEGEND_STEP,

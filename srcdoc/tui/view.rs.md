@@ -77,6 +77,12 @@ its first-use lecture's ten lines, the widest 66 columns, then a prompt a try
 and "Sorry, try again." after each wrong one, and "sudo: 3 incorrect password
 attempts" when all three fail.
 
+## fn health_page
+
+`Health: <Title>` over nu's own expanded table of the record, its colors
+kept, the table drawn to the body's width inside its insets, so a record reads
+as nu shows a record.
+
 ## fn sudo_dialog
 
 The newest lines show, the oldest scrolling away, and the dialog shrinks with

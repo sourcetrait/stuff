@@ -12,6 +12,8 @@ pub(super) fn spec(id: &str, parent: Option<usize>, depends: &[&str]) -> Compone
         },
         parent,
         dir: PathBuf::from("/stuff/component").join(id),
+        removable: true,
+        health: false,
     }
 }
 
@@ -33,11 +35,16 @@ pub(super) fn catalog() -> Catalog {
 
 /// The fixture catalog, one component's scripts marked super.
 pub(super) fn catalog_with_supers(id: &str, supers: Supers) -> Catalog {
+    catalog_with(id, |spec| spec.config.supers = supers)
+}
+
+/// The fixture catalog, one component's spec changed.
+pub(super) fn catalog_with(id: &str, change: impl Fn(&mut ComponentSpec)) -> Catalog {
     let specs = specs()
         .into_iter()
         .map(|mut spec| {
             if spec.id == id {
-                spec.config.supers = supers;
+                change(&mut spec);
             }
             spec
         })

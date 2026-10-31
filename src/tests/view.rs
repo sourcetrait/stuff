@@ -62,6 +62,20 @@ fn the_sudo_dialog_fits_a_small_screen() {
 }
 
 #[test]
+fn the_health_page_titles_the_component_over_its_table() {
+    let mut app = App::new(catalog(), vec![false; 5]);
+    app.screen = Screen::Health;
+    let mut table = Output::default();
+    table.push(b"component  rust\npresent    true\n");
+    app.health = Some(HealthPage { component: 1, table: Some(table), failure: None, scroll: 0 });
+    let buffer = render(&app, 80, 24);
+    let (_, title_y) = find(&buffer, "Health: RUST").expect("the title");
+    let (_, row_y) = find(&buffer, "present    true").expect("the table");
+    assert!(row_y > title_y);
+    assert!(find(&buffer, tui::view::LEGEND_HEALTH).is_some());
+}
+
+#[test]
 fn an_unseen_refresh_draws_no_dialog() {
     let mut app = App::new(catalog(), vec![false; 5]);
     app.sudo = Some(SudoDialog::new(Then::Step(1), false));

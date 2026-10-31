@@ -28,9 +28,15 @@ pub(crate) enum CliAction {
         /// The components to add, with what they depend on.
         components: Vec<String>,
     },
-    /// Removes the components named, or lists those added.
+    /// Removes the components named, or lists those added that can be removed.
     Remove {
         /// The components to remove, with what depends on them.
+        components: Vec<String>,
+    },
+    /// Reports the health of the components named, as NUON.
+    Health {
+        /// The components to check: a record for one, a record of records for several.
+        #[arg(required = true)]
         components: Vec<String>,
     },
 }
@@ -40,6 +46,7 @@ pub(crate) enum CliAction {
 pub(crate) enum CliActionKind {
     Add,
     Remove,
+    Health,
 }
 
 impl CliAction {
@@ -48,13 +55,14 @@ impl CliAction {
         match self {
             Self::Add { .. } => CliActionKind::Add,
             Self::Remove { .. } => CliActionKind::Remove,
+            Self::Health { .. } => CliActionKind::Health,
         }
     }
 
     /// The components named.
     pub(crate) fn components(&self) -> &[String] {
         match self {
-            Self::Add { components } | Self::Remove { components } => components,
+            Self::Add { components } | Self::Remove { components } | Self::Health { components } => components,
         }
     }
 }

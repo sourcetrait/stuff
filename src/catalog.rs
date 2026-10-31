@@ -8,6 +8,8 @@ pub(crate) const COMPONENT_DIR: &str = "component";
 pub(crate) const STUFF_FILE: &str = "stuff.toml";
 /// Each component's configuration file.
 pub(crate) const COMPONENT_FILE: &str = "component.toml";
+/// The type of a component's health record, which its health script requires.
+pub(crate) const HEALTH_TYPE_FILE: &str = "health.nutype";
 /// The icon the stuff directory may carry.
 pub(crate) const LOGO_FILE: &str = "logo.png";
 
@@ -27,6 +29,10 @@ pub(crate) struct ComponentSpec {
     pub(crate) parent: Option<usize>,
     /// Its directory.
     pub(crate) dir: PathBuf,
+    /// Whether it has a remove script.
+    pub(crate) removable: bool,
+    /// Whether it has a health script.
+    pub(crate) health: bool,
 }
 
 /// One component: its name, its card, its place in the graph, and its files.
@@ -50,6 +56,10 @@ pub(crate) struct Component {
     pub(crate) dir: PathBuf,
     /// Which of its scripts are super.
     pub(crate) supers: Supers,
+    /// Whether it has a remove script.
+    pub(crate) removable: bool,
+    /// Whether it has a health script.
+    pub(crate) health: bool,
 }
 
 /// The stuff directory: its configuration and its components in tree order.
@@ -119,6 +129,8 @@ impl Catalog {
                 depth,
                 dir: spec.dir.clone(),
                 supers: spec.config.supers,
+                removable: spec.removable,
+                health: spec.health,
             });
         }
         for i in 0..components.len() {
@@ -267,18 +279,23 @@ fn collect(
     for path in paths.into_iter().filter(|p| p.is_dir() && p.join(COMPONENT_FILE).is_file()) {
         let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         let id = if prefix.is_empty() { name } else { format!("{prefix}/{name}") };
-        for script in [Script::Present, Script::Add, Script::Remove] {
+        for script in [Script::Present, Script::Add] {
             if !path.join(script.file()).is_file() {
                 return LayoutSnafu { path: display(&path), reason: format!("{} is missing", script.file()) }
                     .fail();
             }
+        }
+        let removable = path.join(Script::Remove.file()).is_file();
+        let health = path.join(Script::Health.file()).is_file();
+        if health && !path.join(HEALTH_TYPE_FILE).is_file() {
+            return LayoutSnafu { path: display(&path), reason: format!("{HEALTH_TYPE_FILE} is missing") }.fail();
         }
         let config_path = path.join(COMPONENT_FILE);
         let toml: ComponentConfigToml = read_toml(&config_path)?;
         let config = ComponentConfig::try_from(toml)
             .map_err(|reason| LayoutSnafu { path: display(&config_path), reason }.build())?;
         let index = specs.len();
-        specs.push(ComponentSpec { id: id.clone(), config, parent, dir: path.clone() });
+        specs.push(ComponentSpec { id: id.clone(), config, parent, dir: path.clone(), removable, health });
         collect(&path, Some(index), &id, specs)?;
     }
     Ok(())

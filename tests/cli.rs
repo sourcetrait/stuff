@@ -218,10 +218,90 @@ fn an_unknown_component_is_refused() {
 fn a_component_missing_a_script_is_refused() {
     let t = testing::test!({ .using_temp_dir() });
     let (dir, home) = fixture(t.temp_dir());
-    std::fs::remove_file(dir.join("component/other/remove.nu")).expect("removed");
+    std::fs::remove_file(dir.join("component/other/add.nu")).expect("removed");
     let refused = stuff(&dir, &home, &["add"]);
     assert!(!refused.status.success());
-    assert!(stderr(&refused).contains("remove.nu is missing"), "{}", stderr(&refused));
+    assert!(stderr(&refused).contains("add.nu is missing"), "{}", stderr(&refused));
+}
+
+#[tested]
+fn a_component_without_remove_nu_stays_with_a_warning() {
+    let t = testing::test!({ .using_temp_dir() });
+    let (dir, home) = fixture(t.temp_dir());
+    component(&dir, "keeper", "title = \"Keeper\"\n", ADD);
+    std::fs::remove_file(dir.join("component/keeper/remove.nu")).expect("removed");
+    assert!(stuff(&dir, &home, &["add", "keeper", "base"]).status.success());
+    let listed = stuff(&dir, &home, &["remove"]);
+    assert!(stdout(&listed).contains("keeper"), "{}", stdout(&listed));
+    let removed = stuff(&dir, &home, &["remove", "keeper", "base"]);
+    assert!(removed.status.success(), "{}{}", stdout(&removed), stderr(&removed));
+    assert!(stderr(&removed).contains("\x1b[33m[stuff]\x1b[0m remove not supported: keeper"), "{}", stderr(&removed));
+    assert!(home.join("keeper.added").is_file(), "keeper stays");
+    assert!(!home.join("base.added").exists(), "the rest goes");
+}
+
+/// health.nu reporting its component's own present.nu, and a note when present.
+const HEALTH: &str = "def main [] {
+    let present = ((^$nu.current-exe -n present.nu | complete).exit_code == 0)
+    if not $present { return {component: $env.COMPONENT_ID, present: false} }
+    {component: $env.COMPONENT_ID, present: {note: 'well'}}
+}
+";
+
+/// health.nutype of that record.
+const HEALTH_TYPE: &str = "record<component: path, present: oneof<bool, record<note: string>>>\n";
+
+fn health_scripts(dir: &Path, id: &str, health: &str) {
+    let path = dir.join("component").join(id);
+    write(&path.join("health.nu"), health);
+    write(&path.join("health.nutype"), HEALTH_TYPE);
+}
+
+#[tested]
+fn health_of_one_component_is_its_record() {
+    let t = testing::test!({ .using_temp_dir() });
+    let (dir, home) = fixture(t.temp_dir());
+    health_scripts(&dir, "base", HEALTH);
+    assert!(stuff(&dir, &home, &["add", "base"]).status.success());
+    let health = stuff(&dir, &home, &["health", "base"]);
+    assert!(health.status.success(), "{}", stderr(&health));
+    assert_eq!(stdout(&health).trim(), "{component: base, present: {note: well}}");
+}
+
+#[tested]
+fn health_of_several_is_a_record_of_records() {
+    let t = testing::test!({ .using_temp_dir() });
+    let (dir, home) = fixture(t.temp_dir());
+    health_scripts(&dir, "base", HEALTH);
+    health_scripts(&dir, "other", HEALTH);
+    assert!(stuff(&dir, &home, &["add", "base"]).status.success());
+    let health = stuff(&dir, &home, &["health", "base", "other", "liar"]);
+    assert!(health.status.success(), "{}", stderr(&health));
+    assert_eq!(
+        stdout(&health).trim(),
+        "{\"base\": {component: base, present: {note: well}}, \"other\": {component: other, present: false}, \
+         \"liar\": {component: \"liar\", present: false}}"
+    );
+}
+
+#[tested]
+fn a_health_script_without_its_nutype_is_refused() {
+    let t = testing::test!({ .using_temp_dir() });
+    let (dir, home) = fixture(t.temp_dir());
+    write(&dir.join("component/base/health.nu"), HEALTH);
+    let refused = stuff(&dir, &home, &["add"]);
+    assert!(!refused.status.success());
+    assert!(stderr(&refused).contains("health.nutype is missing"), "{}", stderr(&refused));
+}
+
+#[tested]
+fn a_health_record_of_the_wrong_shape_is_refused() {
+    let t = testing::test!({ .using_temp_dir() });
+    let (dir, home) = fixture(t.temp_dir());
+    health_scripts(&dir, "base", "def main [] { 'fine' }\n");
+    let refused = stuff(&dir, &home, &["health", "base"]);
+    assert!(!refused.status.success());
+    assert!(stderr(&refused).contains("not record<component: path"), "{}", stderr(&refused));
 }
 
 #[tested]

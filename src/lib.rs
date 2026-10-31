@@ -37,7 +37,7 @@ pub(crate) use crate::{
         SpawnSnafu, TerminalSnafu, UnknownSnafu, UnknownStuffSnafu,
     },
     plan::{Plan, Step, StepAction},
-    runner::{RunEvent, Runner, Script},
+    runner::{HealthForm, RunEvent, Runner, Script},
     sudo::{Secret, Validation},
     tui::{
         app::{App, Button, Look, Mark, Screen, SudoDialog},
@@ -49,7 +49,7 @@ pub(crate) use crate::{
 pub(crate) use crate::{
     catalog::ComponentSpec,
     error::CatalogErrorKind,
-    tui::app::{Request, Then},
+    tui::app::{HealthPage, Request, Then},
 };
 
 pub(crate) use ansi_to_tui::IntoText;

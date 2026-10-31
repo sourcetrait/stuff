@@ -16,6 +16,8 @@ pub(crate) enum Screen {
     Confirm,
     /// The run's output.
     Run,
+    /// A component's health record.
+    Health,
 }
 
 /// How the TUI looks: fancy where the terminal scales images to its cells, simple anywhere else.
@@ -64,6 +66,21 @@ pub(crate) enum Request {
     Send,
     /// End sudo, its dialog left.
     Cancel,
+    /// Check a component's health, by index.
+    Health(usize),
+}
+
+/// The health page: a component's health record as nu draws it.
+#[derive(Debug, Clone)]
+pub(crate) struct HealthPage {
+    /// The component, by index.
+    pub(crate) component: usize,
+    /// nu's table of its record, once the check ends.
+    pub(crate) table: Option<Output>,
+    /// The check's failure, when it failed.
+    pub(crate) failure: Option<String>,
+    /// The first line showing.
+    pub(crate) scroll: u16,
 }
 
 /// What follows once sudo holds the credential.
@@ -132,14 +149,20 @@ pub(crate) struct App {
     pub(crate) running: bool,
     /// The run's failure, when it failed.
     pub(crate) failure: Option<String>,
+    /// The components the run left in place, having no remove script, by index.
+    pub(crate) unsupported: Vec<usize>,
     /// The sudo dialog, while sudo validates.
     pub(crate) sudo: Option<SudoDialog>,
+    /// The health page, while it shows.
+    pub(crate) health: Option<HealthPage>,
     /// How the TUI looks.
     pub(crate) look: Look,
     /// The preview's first line showing.
     pub(crate) scroll: u16,
     /// The body's rows at the last frame, which bound the preview's scroll.
     pub(crate) body_rows: u16,
+    /// The body's columns at the last frame, which a health table is drawn to.
+    pub(crate) body_columns: u16,
 }
 
 impl App {
@@ -162,10 +185,13 @@ impl App {
             step: None,
             running: false,
             failure: None,
+            unsupported: Vec::new(),
             sudo: None,
+            health: None,
             look: Look::Simple,
             scroll: 0,
             body_rows: 0,
+            body_columns: 0,
         };
         app.remark();
         app
@@ -229,6 +255,9 @@ impl App {
             }
             return None;
         }
+        if self.screen == Screen::Select && code == Char('h') {
+            return self.open_health();
+        }
         let code = match code {
             Char('w' | 'k') => Up,
             Char('s' | 'j') => Down,
@@ -278,12 +307,14 @@ impl App {
                     self.running = true;
                     self.output = Output::default();
                     self.failure = None;
+                    self.unsupported.clear();
                     self.step = None;
+                    let first = self.runnable(0)?;
                     if self.plan.needs_sudo(&self.catalog) {
-                        self.sudo = Some(SudoDialog::new(Then::Step(0), true));
+                        self.sudo = Some(SudoDialog::new(Then::Step(first), true));
                         return Some(Request::Validate);
                     }
-                    return Some(Request::Step(0));
+                    return Some(Request::Step(first));
                 }
                 Enter | Esc => self.screen = Screen::Preview,
                 _ => {}
@@ -293,8 +324,45 @@ impl App {
                     return Some(self.check());
                 }
             }
+            Screen::Health => match code {
+                Up => {
+                    if let Some(page) = self.health.as_mut() {
+                        page.scroll = page.scroll.saturating_sub(1);
+                    }
+                }
+                Down => {
+                    let limit = self.health_scroll_limit();
+                    if let Some(page) = self.health.as_mut() {
+                        page.scroll = (page.scroll + 1).min(limit);
+                    }
+                }
+                Esc => {
+                    self.health = None;
+                    self.screen = Screen::Select;
+                }
+                _ => {}
+            },
         }
         None
+    }
+
+    /// Opens the health page of the component under the cursor, where it has a health script.
+    fn open_health(&mut self) -> Option<Request> {
+        let i = self.current().filter(|&i| self.catalog.components[i].health)?;
+        self.health = Some(HealthPage { component: i, table: None, failure: None, scroll: 0 });
+        self.screen = Screen::Health;
+        Some(Request::Health(i))
+    }
+
+    /// How far the health page scrolls: until its last line sits at the body's bottom, under the
+    /// page's title and the gap after it.
+    fn health_scroll_limit(&self) -> u16 {
+        let lines = self
+            .health
+            .as_ref()
+            .and_then(|page| page.table.as_ref())
+            .map_or(0, |table| table.lines().len());
+        u16::try_from(lines).unwrap_or(u16::MAX).saturating_sub(self.body_rows.saturating_sub(2))
     }
 
     /// Leaves the sudo dialog, as escape leaves every screen: before a run, back to the preview;
@@ -305,7 +373,7 @@ impl App {
         match sudo.then {
             Then::Check if !self.checked => return Some(Request::Quit),
             Then::Check => {}
-            Then::Step(0) => {
+            Then::Step(_) if self.step.is_none() => {
                 self.running = false;
                 self.screen = Screen::Preview;
             }
@@ -353,7 +421,7 @@ impl App {
             RunEvent::Fail { message } => {
                 self.output.note(&format!("\x1b[31m{message}\x1b[0m"));
                 self.failure = Some(message);
-                self.running = false;
+                self.finish();
             }
             RunEvent::Done { step } => return self.next(step + 1),
             RunEvent::SudoOutput { bytes } => {
@@ -376,22 +444,53 @@ impl App {
                     Then::Check => Request::Check,
                 });
             }
+            RunEvent::Health { component, table } => {
+                if let Some(page) = self.health.as_mut().filter(|page| page.component == component) {
+                    match table {
+                        Ok(text) => {
+                            let mut output = Output::default();
+                            output.push(text.as_bytes());
+                            page.table = Some(output);
+                        }
+                        Err(message) => page.failure = Some(message),
+                    }
+                }
+            }
         }
         None
     }
 
-    /// What follows a step: the next, its credential refreshed first where the plan needs sudo, or
-    /// the run's end.
+    /// What follows a step: the next that runs, its credential refreshed first where the plan needs
+    /// sudo, or the run's end.
     fn next(&mut self, step: usize) -> Option<Request> {
-        if step >= self.plan.steps.len() {
-            self.running = false;
-            return None;
-        }
+        let step = self.runnable(step)?;
         if self.plan.needs_sudo(&self.catalog) {
             self.sudo = Some(SudoDialog::new(Then::Step(step), false));
             return Some(Request::Validate);
         }
         Some(Request::Step(step))
+    }
+
+    /// The first step from the one given that runs, past each removal whose component has no
+    /// remove script, which stays and is warned of at the run's end; none ends the run.
+    fn runnable(&mut self, mut step: usize) -> Option<usize> {
+        while let Some(&Step { action, component }) = self.plan.steps.get(step) {
+            if action == StepAction::Add || self.catalog.components[component].removable {
+                return Some(step);
+            }
+            self.unsupported.push(component);
+            step += 1;
+        }
+        self.finish();
+        None
+    }
+
+    /// Ends the run, warning of each removal it left undone.
+    fn finish(&mut self) {
+        self.running = false;
+        for &component in &self.unsupported {
+            self.output.note(&run::unsupported_remove(&self.catalog.components[component].id));
+        }
     }
 
     /// Takes every component's state afresh, clearing the marks and the list's order.
@@ -484,6 +583,7 @@ fn drive(
         let area = terminal.draw(|frame| tui::view::draw(frame, &app, icons)).context(TerminalSnafu)?.area;
         let [_, body, _] = tui::view::regions(area);
         app.body_rows = body.height;
+        app.body_columns = body.width;
         if !ratatui::crossterm::event::poll(TICK).context(TerminalSnafu)? {
             continue;
         }
@@ -529,6 +629,10 @@ fn serve(
             }
         }
         Request::Cancel => *validation = None,
+        Request::Health(i) => {
+            let width = tui::view::health_width(app.body_columns);
+            runner.spawn_health(&app.catalog.components[i], i, width, sender.clone());
+        }
     }
     Ok(None)
 }

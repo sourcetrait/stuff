@@ -71,12 +71,13 @@ pub(crate) struct Supers {
 }
 
 impl Supers {
-    /// Whether a script is super.
+    /// Whether a script is super; a health script never is, being user-level.
     pub(crate) fn of(self, script: Script) -> bool {
         match script {
             Script::Present => self.present,
             Script::Add => self.add,
             Script::Remove => self.remove,
+            Script::Health => false,
         }
     }
 }

@@ -28,8 +28,13 @@ fn dispatch(cli: Cli) -> Result<ExitCode> {
     let Some(action) = cli.action else {
         return tui::app::run(catalog, runner, cli.look);
     };
-    let added = runner.present_all(&catalog)?;
     let kind = action.kind();
+    if kind == CliActionKind::Health {
+        let picked = catalog.resolve(action.components())?;
+        println!("{}", health(&catalog, &runner, &picked)?);
+        return Ok(ExitCode::SUCCESS);
+    }
+    let added = runner.present_all(&catalog)?;
     if action.components().is_empty() {
         list(&catalog, &added, kind == CliActionKind::Remove);
         return Ok(ExitCode::SUCCESS);
@@ -37,10 +42,45 @@ fn dispatch(cli: Cli) -> Result<ExitCode> {
     let picked = catalog.resolve(action.components())?;
     let plan = match kind {
         CliActionKind::Add => Plan::new(&catalog, &added, &picked, &[]),
-        CliActionKind::Remove => Plan::new(&catalog, &added, &[], &picked),
+        _ => Plan::new(&catalog, &added, &[], &picked),
     };
     execute(&catalog, &runner, &plan, kind)?;
     Ok(ExitCode::SUCCESS)
+}
+
+/// The health of the components picked, as NUON: a record for one, a record of records keyed by
+/// name for several. A component without a health script reports its present script's answer.
+fn health(catalog: &Catalog, runner: &Runner, picked: &[usize]) -> Result<String> {
+    let mut records: Vec<(&str, String)> = Vec::with_capacity(picked.len());
+    for &i in picked {
+        let component = &catalog.components[i];
+        if records.iter().any(|(id, _)| *id == component.id) {
+            continue;
+        }
+        let record = if component.health {
+            runner.health(component, HealthForm::Nuon)?
+        } else {
+            let present = runner.present(component)?;
+            format!("{{component: {}, present: {present}}}", nuon_string(&component.id))
+        };
+        records.push((component.id.as_str(), record));
+    }
+    if let [(_, record)] = records.as_slice() {
+        return Ok(record.clone());
+    }
+    let fields: Vec<String> = records.iter().map(|(id, record)| format!("{}: {record}", nuon_string(id))).collect();
+    Ok(format!("{{{}}}", fields.join(", ")))
+}
+
+/// A string as NUON writes it quoted.
+fn nuon_string(text: &str) -> String {
+    format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
+/// The warning a removal gives where its component has no remove script: yellow `[stuff]`, then
+/// the component's name.
+pub(crate) fn unsupported_remove(id: &str) -> String {
+    format!("\x1b[33m[stuff]\x1b[0m remove not supported: {id}")
 }
 
 /// Prints the components added, or those not, one a line.
@@ -60,7 +100,7 @@ fn execute(catalog: &Catalog, runner: &Runner, plan: &Plan, kind: CliActionKind)
     if plan.is_empty() {
         let verb = match kind {
             CliActionKind::Add => "add",
-            CliActionKind::Remove => "remove",
+            _ => "remove",
         };
         println!("nothing to {verb}");
         return Ok(());
@@ -68,11 +108,25 @@ fn execute(catalog: &Catalog, runner: &Runner, plan: &Plan, kind: CliActionKind)
     for step in &plan.steps {
         println!("[{}] {}", step.action.label(), catalog.components[step.component].id);
     }
+    let mut unsupported = Vec::new();
+    let mut outcome = Ok(());
     for step in &plan.steps {
         let component = &catalog.components[step.component];
+        if step.action == StepAction::Remove && !component.removable {
+            unsupported.push(component.id.as_str());
+            continue;
+        }
         println!("== {} {}", step.action.label(), component.id);
-        runner.step_inherit(component, step.action)?;
+        if let Err(error) = runner.step_inherit(component, step.action) {
+            outcome = Err(error.into());
+            break;
+        }
     }
-    println!("done");
-    Ok(())
+    if outcome.is_ok() {
+        println!("done");
+    }
+    for id in unsupported {
+        eprintln!("{}", unsupported_remove(id));
+    }
+    outcome
 }

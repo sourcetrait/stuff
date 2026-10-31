@@ -1,6 +1,6 @@
 use crate::*;
 
-use super::catalog::{catalog, catalog_with_supers};
+use super::catalog::{catalog, catalog_with, catalog_with_supers};
 
 fn app(added: [bool; 5]) -> App {
     App::new(catalog(), added.to_vec())
@@ -201,6 +201,7 @@ fn escape_from_a_later_dialog_ends_the_run() {
     let mut app = super_add();
     proceed(&mut app, "zed");
     app.event(RunEvent::SudoExit { ok: true });
+    app.event(RunEvent::Begin { step: 0 });
     app.event(RunEvent::Done { step: 0 });
     app.event(RunEvent::SudoOutput { bytes: b"[sudo] password for test: ".to_vec() });
     assert_eq!(app.key(r::KeyCode::Esc), Some(Request::Cancel));
@@ -218,6 +219,45 @@ fn a_super_present_check_waits_on_the_dialog_and_escape_leaves() {
     assert!(sudo.shown);
     assert_eq!(sudo.then, Then::Check);
     assert_eq!(app.key(r::KeyCode::Esc), Some(Request::Quit));
+}
+
+#[test]
+fn a_removal_without_a_remove_script_is_skipped_and_warned_of_at_the_end() {
+    let catalog = catalog_with("rust/riscv", |spec| spec.removable = false);
+    let mut app = App::new(catalog, vec![false, true, true, true, false]);
+    assert_eq!(proceed(&mut app, "rust"), Some(Request::Step(0)), "nightly goes first");
+    app.event(RunEvent::Begin { step: 0 });
+    assert_eq!(app.event(RunEvent::Done { step: 0 }), Some(Request::Step(2)), "riscv is passed over");
+    app.event(RunEvent::Begin { step: 2 });
+    assert_eq!(app.event(RunEvent::Done { step: 2 }), None);
+    assert!(!app.running);
+    assert!(app.failure.is_none(), "a warning, not a failure");
+    let last = app.output.lines().last().map(|line| String::from_utf8_lossy(line).into_owned());
+    assert_eq!(last.as_deref(), Some("\x1b[33m[stuff]\x1b[0m remove not supported: rust/riscv"));
+}
+
+#[test]
+fn h_opens_the_health_page_of_a_component_with_a_health_script() {
+    let mut app = App::new(catalog_with("rust/nightly", |spec| spec.health = true), vec![false; 5]);
+    at(&mut app, "rust/nightly");
+    let nightly = app.current().expect("a component");
+    assert_eq!(app.key(r::KeyCode::Char('h')), Some(Request::Health(nightly)));
+    assert_eq!(app.screen, Screen::Health);
+    app.event(RunEvent::Health { component: nightly, table: Ok("╭──╮\n│ok│\n╰──╯".to_string()) });
+    let table = app.health.as_ref().and_then(|page| page.table.as_ref()).expect("the table");
+    assert_eq!(table.lines().len(), 3);
+    assert_eq!(app.key(r::KeyCode::Esc), None);
+    assert_eq!(app.screen, Screen::Select);
+    assert!(app.health.is_none());
+}
+
+#[test]
+fn h_does_nothing_where_the_component_has_no_health_script() {
+    let mut app = app([false; 5]);
+    at(&mut app, "rust/nightly");
+    assert_eq!(app.key(r::KeyCode::Char('h')), None);
+    assert_eq!(app.screen, Screen::Select);
+    assert_eq!(app.catalog.components[app.current().expect("a component")].id, "rust/nightly", "h moves nothing on the list");
 }
 
 #[test]

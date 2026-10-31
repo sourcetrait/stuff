@@ -49,6 +49,18 @@ credential is refreshed before each step, whether that step's scripts use it
 or not, and a lapsed one asks in the dialog. The first step's refresh is the
 dialog shown before anything starts.
 
+### fn runnable, fn finish
+
+A removal whose component has no remove.nu is passed over and the rest run;
+the run's end warns of each in the output, as the command line does on
+stderr.
+
+### fn open_health
+
+On the list, `h` is health's key, read before helix's `h` would move left; a
+component without a health script takes no page, the CLI's record for it being
+present.nu's answer alone.
+
 ### fn refresh
 
 After a run, every present script runs again rather than trusting the plan, and the

@@ -28,6 +28,19 @@ included, dominates the time, and the checks are independent. The super ones
 run after them, one at a time, so on the command line only the first one's
 `sudo -v` asks and the rest find the credential cached.
 
+### fn health
+
+health.nu is sourced from its component's directory and its main called, so a
+health script returns its record as any nu command does, and its record's
+outer shape is checked in the same nu: a record of `component`, a string, and
+`present`, a bool or a record whose fields the component's health.nutype
+gives and Stuff takes untyped. The record comes out as NUON for the command
+line, or as nu's expanded table, its colors forced on, for the TUI's page.
+
+### fn spawn_health
+
+The check runs off the loop, the page showing `checking` until it ends.
+
 ### fn spawn_step
 
 One step a thread, the TUI choosing the next once one is done, so it can
