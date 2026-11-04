@@ -40,7 +40,7 @@ pub(crate) fn line(tone: Tone, message: &str) -> String {
 
 /// What a successful run reports just before its success.
 pub(crate) fn fresh_login() -> String {
-    "\x1b[34m[sysbox]\x1b[0m Environment changes require a fresh terminal login".to_string()
+    line(Tone::Info, "Environment changes require a fresh terminal login")
 }
 
 /// Reports on the terminal, or loads the stuff, then runs the TUI or the action named.

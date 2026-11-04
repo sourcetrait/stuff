@@ -243,7 +243,7 @@ fn a_successful_run_says_a_fresh_login_is_needed_as_its_last_line() {
     app.event(RunEvent::Begin { step: 0 });
     app.event(RunEvent::Done { step: 0 });
     let last = app.output.lines().last().map(|line| String::from_utf8_lossy(line).into_owned());
-    assert_eq!(last.as_deref(), Some("\x1b[34m[sysbox]\x1b[0m Environment changes require a fresh terminal login"));
+    assert_eq!(last.as_deref(), Some("\x1b[34m[stuff]\x1b[0m Environment changes require a fresh terminal login"));
 }
 
 #[test]

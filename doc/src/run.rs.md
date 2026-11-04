@@ -11,8 +11,7 @@ read, stay as they are.
 
 What a run that succeeded says just before its success, on the command line and
 in the TUI's output. A component's environment changes reach new logins alone,
-Stuff being a child of the shell that called it. The line is `[sysbox]`, as User
-gave it, where Stuff's own say `[stuff]`.
+Stuff being a child of the shell that called it.
 
 ## fn dispatch
 

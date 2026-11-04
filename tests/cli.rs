@@ -12,7 +12,7 @@ static TESTING: testing::Module = testing::module!(Integration, {
 const ACTIONS: &str = "actions = [\"present\", \"add\", \"remove\"]\n";
 
 /// What a run says just before its success.
-const FRESH_LOGIN: &str = "\x1b[34m[sysbox]\x1b[0m Environment changes require a fresh terminal login\n";
+const FRESH_LOGIN: &str = "\x1b[34m[stuff]\x1b[0m Environment changes require a fresh terminal login\n";
 
 /// add writing the marker.
 const ADD: &str = "print $'adding ($ID) from ($env.PWD | path basename)'\n    $ID | save --force (marker)";

@@ -68,7 +68,7 @@ fn the_preview_shows_what_will_be_updated_in_a_section_of_its_own() {
 fn a_finished_run_shows_the_fresh_login_line_above_its_success() {
     let mut app = App::new(catalog(), vec![false; 5]);
     app.screen = Screen::Run;
-    app.output.note("\x1b[34m[sysbox]\x1b[0m Environment changes require a fresh terminal login");
+    app.output.note("\x1b[34m[stuff]\x1b[0m Environment changes require a fresh terminal login");
     let buffer = render(&app, 80, 24);
     let (_, line_y) = find(&buffer, "Environment changes require a fresh terminal login").expect("the line");
     let (_, done_y) = find(&buffer, "done").expect("the success");
