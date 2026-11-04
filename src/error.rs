@@ -6,6 +6,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub(crate) type CatalogResult<T> = Result<T, CatalogError>;
 /// The runner's result.
 pub(crate) type RunnerResult<T> = Result<T, RunnerError>;
+/// The source's result.
+pub(crate) type SourceResult<T> = Result<T, SourceError>;
 
 /// A failure loading the components, running their actions, or drawing.
 #[derive(Debug, snafu::Snafu)]
@@ -20,9 +22,9 @@ pub enum Error {
     /// The terminal failed to draw or read a key.
     #[snafu(display("terminal: {source}"))]
     Terminal { source: std::io::Error },
-    /// The source named is no stuff Stuff knows: not a stuff directory.
-    #[snafu(display("what stuff? {name:?}"))]
-    UnknownStuff { name: String },
+    /// The source failed to reach any stuff.
+    #[snafu(transparent)]
+    Source { source: SourceError },
 }
 
 /// The kind of an [`Error`].
@@ -31,7 +33,7 @@ pub enum ErrorKind {
     Catalog,
     Runner,
     Terminal,
-    UnknownStuff,
+    Source,
 }
 
 impl Error {
@@ -41,7 +43,61 @@ impl Error {
             Self::Catalog { .. } => ErrorKind::Catalog,
             Self::Runner { .. } => ErrorKind::Runner,
             Self::Terminal { .. } => ErrorKind::Terminal,
-            Self::UnknownStuff { .. } => ErrorKind::UnknownStuff,
+            Self::Source { .. } => ErrorKind::Source,
+        }
+    }
+}
+
+/// A failure reaching the stuff a source names.
+#[derive(Debug, snafu::Snafu)]
+#[snafu(visibility(pub(crate)))]
+pub enum SourceError {
+    /// The source named is no stuff Stuff knows.
+    #[snafu(display("what stuff? {name:?}: {tried}"))]
+    UnknownStuff { name: String, tried: String },
+    /// The aliases' file failed to read.
+    #[snafu(display("reading {path}: {source}"))]
+    AliasRead { path: String, source: std::io::Error },
+    /// The aliases' file failed to parse.
+    #[snafu(display("parsing {path}: {source}"))]
+    AliasParse { path: String, source: toml::de::Error },
+    /// Neither an XDG home nor a home is set.
+    #[snafu(display("neither {variable} nor HOME is set"))]
+    NoHome { variable: String },
+    /// The directory kept for a URI's stuff failed.
+    #[snafu(display("fetching {uri}: {source}"))]
+    FetchDir { uri: String, source: std::io::Error },
+    /// git failed to start.
+    #[snafu(display("fetching {uri}: starting git: {source}"))]
+    FetchStart { uri: String, source: std::io::Error },
+    /// git failed.
+    #[snafu(display("fetching {uri}: git: {status}"))]
+    Fetch { uri: String, status: String },
+}
+
+/// The kind of a [`SourceError`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SourceErrorKind {
+    UnknownStuff,
+    AliasRead,
+    AliasParse,
+    NoHome,
+    FetchDir,
+    FetchStart,
+    Fetch,
+}
+
+impl SourceError {
+    /// The error's kind.
+    pub fn kind(&self) -> SourceErrorKind {
+        match self {
+            Self::UnknownStuff { .. } => SourceErrorKind::UnknownStuff,
+            Self::AliasRead { .. } => SourceErrorKind::AliasRead,
+            Self::AliasParse { .. } => SourceErrorKind::AliasParse,
+            Self::NoHome { .. } => SourceErrorKind::NoHome,
+            Self::FetchDir { .. } => SourceErrorKind::FetchDir,
+            Self::FetchStart { .. } => SourceErrorKind::FetchStart,
+            Self::Fetch { .. } => SourceErrorKind::Fetch,
         }
     }
 }

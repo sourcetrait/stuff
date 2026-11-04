@@ -114,6 +114,169 @@ fn a_directory_holding_config_toml_is_unknown_stuff() {
     assert!(stderr(&refused).contains("what stuff?"), "{}", stderr(&refused));
 }
 
+/// The command on a source as written, from a directory, any URI named pointing at a local path.
+fn from_source(source: &str, cwd: &Path, home: &Path, remote: Option<(&str, &Path)>, args: &[&str]) -> Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_stuff"));
+    command
+        .current_dir(cwd)
+        .arg(source)
+        .args(args)
+        .env("HOME", home)
+        .env("XDG_CONFIG_HOME", home.join(".config"))
+        .env("XDG_CACHE_HOME", home.join(".cache"))
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null");
+    if let Some((uri, path)) = remote {
+        command
+            .env("GIT_CONFIG_COUNT", "1")
+            .env("GIT_CONFIG_KEY_0", format!("url.file://{}.insteadOf", path.display()))
+            .env("GIT_CONFIG_VALUE_0", uri);
+    }
+    command.output().expect("the stuff binary runs")
+}
+
+/// A directory's whole tree committed, its repository made if need be.
+fn committed(dir: &Path) {
+    let git = |args: &[&str]| {
+        let done = Command::new("git")
+            .arg("-C")
+            .arg(dir)
+            .args(["-c", "user.name=stuff", "-c", "user.email=stuff@example.invalid", "-c", "commit.gpgsign=false"])
+            .args(args)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .output()
+            .expect("git runs");
+        assert!(done.status.success(), "{args:?}: {}", String::from_utf8_lossy(&done.stderr));
+    };
+    if !dir.join(".git").exists() {
+        git(&["init", "-q"]);
+    }
+    git(&["add", "-A"]);
+    git(&["commit", "-q", "-m", "stuff"]);
+}
+
+const URI: &str = "https://stuff.invalid/team/stuff.git";
+
+#[tested]
+fn a_uri_is_fetched_then_worked_on_as_a_directory() {
+    let t = testing::test!({ .using_temp_dir() });
+    let (dir, home) = fixture(t.temp_dir());
+    committed(&dir);
+    let remote = Some((URI, dir.as_path()));
+
+    let listed = from_source(URI, &home, &home, remote, &["add"]);
+    assert!(listed.status.success(), "{}", stderr(&listed));
+    assert!(ids(&listed).contains(&"base".to_string()), "{}", stdout(&listed));
+    assert!(!stdout(&listed).contains("fetching"), "a list stays what agents read: {}", stdout(&listed));
+    assert!(stderr(&listed).contains(&format!("fetching {URI}")), "{}", stderr(&listed));
+
+    let added = from_source(URI, &home, &home, remote, &["add", "base"]);
+    assert!(added.status.success(), "{}", stderr(&added));
+    assert!(home.join("base.added").exists());
+
+    let health = from_source(URI, &home, &home, remote, &["health", "base"]);
+    assert!(stdout(&health).starts_with('{'), "health stays NUON alone: {}", stdout(&health));
+
+    component(&dir, "late", "title = \"Late\"\n", ADD);
+    committed(&dir);
+    let again = from_source(URI, &home, &home, remote, &["add"]);
+    assert!(again.status.success(), "{}", stderr(&again));
+    assert!(ids(&again).contains(&"late".to_string()), "the remote's head reaches each run: {}", stdout(&again));
+}
+
+#[tested]
+fn a_uri_failing_to_fetch_fails_the_command() {
+    let t = testing::test!({ .using_temp_dir() });
+    let (_, home) = fixture(t.temp_dir());
+    let missing = t.temp_dir().join("no-such-repository");
+    let refused = from_source(URI, &home, &home, Some((URI, missing.as_path())), &["add"]);
+    assert!(!refused.status.success());
+    assert!(stderr(&refused).contains(&format!("fetching {URI}: git")), "{}", stderr(&refused));
+    assert!(!stderr(&refused).contains("what stuff?"), "{}", stderr(&refused));
+    let source = home.join(".cache/stuff/source");
+    let left = std::fs::read_dir(&source).expect("its directory").count();
+    assert_eq!(left, 0, "nothing left in {}", source.display());
+}
+
+#[tested]
+fn a_uri_reaching_no_stuff_is_unknown_stuff() {
+    let t = testing::test!({ .using_temp_dir() });
+    let (dir, home) = fixture(t.temp_dir());
+    std::fs::rename(dir.join("stuff.toml"), dir.join("config.toml")).expect("renamed");
+    committed(&dir);
+    let refused = from_source(URI, &home, &home, Some((URI, dir.as_path())), &["add"]);
+    assert!(!refused.status.success());
+    assert!(stderr(&refused).contains("what stuff?"), "{}", stderr(&refused));
+    assert!(stderr(&refused).contains(URI), "{}", stderr(&refused));
+}
+
+#[tested]
+fn an_alias_reaches_a_directory_or_a_uri() {
+    let t = testing::test!({ .using_temp_dir() });
+    let (dir, home) = fixture(t.temp_dir());
+    committed(&dir);
+    let aliases = format!("here = \"{}\"\nthere = \"{URI}\"\n", dir.display());
+    write(&home.join(".config/stuff/alias.toml"), &aliases);
+
+    let here = from_source("here", &home, &home, None, &["add"]);
+    assert!(here.status.success(), "{}", stderr(&here));
+    assert!(ids(&here).contains(&"base".to_string()), "{}", stdout(&here));
+
+    let there = from_source("there", &home, &home, Some((URI, dir.as_path())), &["add"]);
+    assert!(there.status.success(), "{}", stderr(&there));
+    assert!(ids(&there).contains(&"base".to_string()), "{}", stdout(&there));
+}
+
+#[tested]
+fn an_alias_takes_its_home_where_it_says_so() {
+    let t = testing::test!({ .using_temp_dir() });
+    let (dir, home) = fixture(t.temp_dir());
+    std::fs::rename(&dir, home.join("mine")).expect("moved home");
+    write(&home.join(".config/stuff/alias.toml"), "mine = \"~/mine\"\n");
+    let listed = from_source("mine", &home, &home, None, &["add"]);
+    assert!(listed.status.success(), "{}", stderr(&listed));
+    assert!(ids(&listed).contains(&"base".to_string()), "{}", stdout(&listed));
+}
+
+#[tested]
+fn an_alias_naming_a_word_is_refused() {
+    let t = testing::test!({ .using_temp_dir() });
+    let (_, home) = fixture(t.temp_dir());
+    write(&home.join(".config/stuff/alias.toml"), "one = \"two\"\ntwo = \"one\"\n");
+    let refused = from_source("one", &home, &home, None, &["add"]);
+    assert!(!refused.status.success());
+    assert!(stderr(&refused).contains("what stuff?"), "{}", stderr(&refused));
+    assert!(stderr(&refused).contains("neither a URI nor a path"), "{}", stderr(&refused));
+}
+
+#[tested]
+fn a_plain_word_is_an_alias_whatever_sits_beside_it() {
+    let t = testing::test!({ .using_temp_dir() });
+    let (dir, home) = fixture(t.temp_dir());
+    let cwd = dir.parent().expect("its parent");
+    let word = dir.file_name().expect("its name").to_str().expect("plain");
+
+    let refused = from_source(word, cwd, &home, None, &["add"]);
+    assert!(!refused.status.success());
+    assert!(stderr(&refused).contains("what stuff?"), "{}", stderr(&refused));
+    assert!(stderr(&refused).contains("no alias by that name"), "{}", stderr(&refused));
+
+    let named = from_source(&format!("./{word}"), cwd, &home, None, &["add"]);
+    assert!(named.status.success(), "{}", stderr(&named));
+    assert!(ids(&named).contains(&"base".to_string()), "{}", stdout(&named));
+}
+
+#[tested]
+fn a_mistyped_path_is_never_taken_for_an_alias() {
+    let t = testing::test!({ .using_temp_dir() });
+    let (_, home) = fixture(t.temp_dir());
+    let refused = from_source("./nope", &home, &home, None, &["add"]);
+    assert!(!refused.status.success());
+    assert!(stderr(&refused).contains("what stuff?"), "{}", stderr(&refused));
+    assert!(stderr(&refused).contains("not a stuff directory"), "{}", stderr(&refused));
+}
+
 #[tested]
 fn a_subdirectory_without_component_toml_is_no_component() {
     let t = testing::test!({ .using_temp_dir() });

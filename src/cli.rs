@@ -12,7 +12,7 @@ pub(crate) struct Cli {
     /// Reports what the terminal can draw: its look, graphics protocol, and cell size.
     #[arg(long, exclusive = true)]
     pub(crate) probe: bool,
-    /// The stuff: a stuff directory.
+    /// The stuff: a URI, a stuff directory, or an alias.
     #[arg(required_unless_present = "probe")]
     pub(crate) source: Option<PathBuf>,
     /// The action; none opens the TUI.

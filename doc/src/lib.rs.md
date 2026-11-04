@@ -27,7 +27,6 @@ ratatui-image builds against.
 
 ## The stuff directory
 
-
 ```
 <dir>/
   stuff.toml            title = "..."

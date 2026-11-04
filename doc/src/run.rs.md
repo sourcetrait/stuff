@@ -15,8 +15,8 @@ Stuff being a child of the shell that called it.
 
 ## fn dispatch
 
-`--probe` reports and returns. The source is a stuff directory when it holds a
-stuff.toml; any other is `what stuff?`, the source named. Every module is held
+`--probe` reports and returns. The source reaches its stuff directory by its form
+(`source.rs`). Every module is held
 to its component.toml first, a broken one refused before anything runs. Every
 component's present runs next, the TUI's first screen and the CLI's lists and
 plans alike needing the state; the TUI runs its own check, which waits on the

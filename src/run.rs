@@ -48,10 +48,7 @@ fn dispatch(cli: Cli) -> Result<ExitCode> {
     if cli.probe {
         return tui::look::probe();
     }
-    let source = cli.source.unwrap_or_default();
-    if !crate::catalog::holds_stuff(&source) {
-        return UnknownStuffSnafu { name: source.display().to_string() }.fail();
-    }
+    let source = Source::parse(&cli.source.unwrap_or_default()).directory()?;
     let catalog = Catalog::load(&source)?;
     let runner = Runner::new();
     runner.contract_all(&catalog)?;

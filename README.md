@@ -9,18 +9,32 @@ Usage
 --------------------------------------------------------------------------------
 
 ```
-stuff <dir>                         the TUI
-stuff <dir> add                     lists the components not added
-stuff <dir> update                  lists the components added that can be updated
-stuff <dir> remove                  lists the components added
-stuff <dir> add <components>...     adds them, with what they depend on
-stuff <dir> update <components>...  updates those added
-stuff <dir> remove <components>...  removes them, with what depends on them
-stuff <dir> health <components>...  their health, as NUON
-stuff --probe                       what the terminal can draw
+stuff <source>                         the TUI
+stuff <source> add                     lists the components not added
+stuff <source> update                  lists the components added that can be updated
+stuff <source> remove                  lists the components added
+stuff <source> add <components>...     adds them, with what they depend on
+stuff <source> update <components>...  updates those added
+stuff <source> remove <components>...  removes them, with what depends on them
+stuff <source> health <components>...  their health, as NUON
+stuff --probe                          what the terminal can draw
 ```
 
-The source is a stuff directory, one holding a `stuff.toml`.
+The source is one of three, and anything else is `what stuff?`:
+
+- A URI, a git remote holding a `stuff.toml` at its root: `http://`, `https://`,
+  `git://`, `ssh://`, or `user@host:path`. Stuff fetches its head each run and
+  keeps it under `$XDG_CACHE_HOME/stuff/source/`.
+- A stuff directory, one holding a `stuff.toml`, named by a path: anything holding
+  a `/` or starting with `.` or `~`.
+- An alias, a plain word, which `$XDG_CONFIG_HOME/stuff/alias.toml` names as a URI
+  or a path. A plain word is always an alias, so `stuff rust` means the same
+  wherever it runs, and `./rust` names the directory.
+
+```toml
+rust = "~/stuff/rust"
+team = "git@host:team/stuff.git"
+```
 
 In the TUI, `w` `a` `s` `d` move, as do helix's `k` `h` `j` `l` and the
 arrows; space marks a component to add or remove, enter goes on, and escape

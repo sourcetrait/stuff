@@ -7,6 +7,7 @@ pub(crate) mod error;
 pub(crate) mod plan;
 pub(crate) mod run;
 pub(crate) mod runner;
+pub(crate) mod source;
 pub(crate) mod sudo;
 pub(crate) mod tui {
     pub(crate) mod app;
@@ -33,11 +34,14 @@ pub(crate) use crate::{
     cli::{Cli, CliActionKind},
     config::{Action, Actions, ComponentConfig, ComponentConfigToml, StuffConfig, StuffConfigToml},
     error::{
-        ActionSnafu, CatalogResult, GraphSnafu, LayoutSnafu, ParseSnafu, ReadSnafu, RunnerResult,
-        SpawnSnafu, TerminalSnafu, UnknownSnafu, UnknownStuffSnafu,
+        ActionSnafu, AliasParseSnafu, AliasReadSnafu, CatalogResult, FetchDirSnafu, FetchSnafu,
+        FetchStartSnafu, GraphSnafu, LayoutSnafu, NoHomeSnafu, ParseSnafu, ReadSnafu, RunnerResult,
+        SourceResult, SpawnSnafu, TerminalSnafu, UnknownSnafu, UnknownStuffSnafu,
     },
     plan::{Plan, Step, StepAction},
+    run::{Tone, line},
     runner::{HealthForm, RunEvent, Runner},
+    source::Source,
     sudo::{Secret, Validation},
     tui::{
         app::{App, Button, Look, Mark, Screen, SudoDialog},
@@ -56,6 +60,7 @@ pub(crate) use ansi_to_tui::IntoText;
 pub(crate) use snafu::ResultExt;
 pub(crate) use std::{
     collections::HashMap,
+    env,
     ffi::{OsStr, OsString},
     io::Read,
     path::{Path, PathBuf},
@@ -74,6 +79,7 @@ mod tests {
     mod catalog;
     mod output;
     mod plan;
+    mod source;
     mod sudo;
     mod view;
 }
