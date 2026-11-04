@@ -1,55 +1,28 @@
-//! The scripts run: nu with the user's env and config, from each component's directory.
+//! The actions run: a component's mod.nu as an overlay in nu, with the user's env and config.
 
 use crate::*;
 
-/// The variable naming the stuff directory to a script.
-pub(crate) const ENV_STUFF_DIR: &str = "STUFF_DIR";
-/// The variable naming the script's component.
-pub(crate) const ENV_COMPONENT_ID: &str = "COMPONENT_ID";
-/// The variable naming the script's component directory.
-pub(crate) const ENV_COMPONENT_DIR: &str = "COMPONENT_DIR";
-
-/// A component's script.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Script {
-    /// Exits 0 when the component is added, 1 when not.
-    Present,
-    /// Adds the component.
-    Add,
-    /// Removes the component.
-    Remove,
-    /// Returns the component's health record, where the component has one.
-    Health,
-}
-
-impl Script {
-    /// The script's file name.
-    pub(crate) fn file(self) -> &'static str {
-        match self {
-            Self::Present => "present.nu",
-            Self::Add => "add.nu",
-            Self::Remove => "remove.nu",
-            Self::Health => "health.nu",
-        }
-    }
-}
-
-/// The nu program of a health check: health.nu sourced from its component's directory, then its
-/// record's outer shape checked; the record's form follows.
-const HEALTH: &str = "source health.nu
-let health = (main)
+/// A health check after its overlay: the action called, then its record's outer shape checked; the
+/// record's form follows.
+const HEALTH: &str = "let health = (component health)
 let shape = ($health | describe)
 if (not ($shape | str starts-with 'record')) {
-    error make --unspanned {msg: $'health.nu returned ($shape), not record<component: path, present: oneof<bool, record>>'}
+    error make --unspanned {msg: $'returned ($shape), not record<component: path, present: oneof<bool, record>>'}
 }
 if (($health | columns | sort) != [component present]) or (($health.component | describe) != 'string') {
-    error make --unspanned {msg: $'health.nu returned ($shape), not record<component: path, present: oneof<bool, record>>'}
+    error make --unspanned {msg: $'returned ($shape), not record<component: path, present: oneof<bool, record>>'}
 }
 let present = ($health.present | describe)
 if (not ($present == 'bool' or ($present | str starts-with 'record'))) {
-    error make --unspanned {msg: $'health.nu returned present as ($present), not a bool or a record'}
+    error make --unspanned {msg: $'returned present as ($present), not a bool or a record'}
 }
 ";
+
+/// What a module's contract check prints after its overlay: its exports' names, one a line.
+const EXPORTS: &str = "scope commands | where name starts-with 'component ' | get name | str join (char nl)";
+
+/// The name of a contract check in an error: what it checks.
+const CONTRACT: &str = "mod.nu";
 
 /// The form a health record is given in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,7 +41,7 @@ pub(crate) enum HealthForm {
 pub(crate) enum RunEvent {
     /// A step begins, by its index in the plan.
     Begin { step: usize },
-    /// A script wrote to stdout or stderr.
+    /// An action wrote to stdout or stderr.
     Output { bytes: Vec<u8> },
     /// A step failed and the run stopped.
     Fail { message: String },
@@ -111,42 +84,38 @@ impl RunEvent {
     }
 }
 
-/// Starts nu for the components' scripts.
+/// Starts nu for the components' actions.
 #[derive(Debug, Clone)]
 pub(crate) struct Runner {
     /// The nu program.
     nu: OsString,
     /// nu's flags: the user's env and config, or none.
     flags: Vec<OsString>,
-    /// The stuff directory, absolute.
-    dir: PathBuf,
 }
 
 impl Runner {
-    /// The runner for a stuff directory, with the user's own nushell config.
-    pub(crate) fn new(dir: &Path) -> Self {
+    /// The runner, with the user's own nushell config.
+    pub(crate) fn new() -> Self {
         let nu = OsString::from("nu");
         let flags = config_flags(&nu);
-        Self { nu, flags, dir: dir.to_path_buf() }
+        Self { nu, flags }
     }
 
-    /// The command running a component's script.
-    pub(crate) fn command(&self, component: &Component, script: Script) -> Command {
-        let mut command = self.nu_for(component);
-        command.arg(component.dir.join(script.file()));
-        command
+    /// The command calling a component's action.
+    pub(crate) fn command(&self, component: &Component, action: Action) -> Command {
+        self.program(component, &format!("component {}\n", action.name()))
     }
 
-    /// nu with the user's config, from a component's directory, the component's variables set.
-    fn nu_for(&self, component: &Component) -> Command {
+    /// nu with the user's config, from a component's directory, running a program after the
+    /// component's overlay.
+    fn program(&self, component: &Component, program: &str) -> Command {
         let mut command = Command::new(&self.nu);
         command
             .args(&self.flags)
             .current_dir(&component.dir)
-            .env(ENV_STUFF_DIR, &self.dir)
-            .env(ENV_COMPONENT_ID, &component.id)
-            .env(ENV_COMPONENT_DIR, &component.dir)
-            .stdin(Stdio::null());
+            .stdin(Stdio::null())
+            .arg("-c")
+            .arg(format!("{}{program}", overlay(component)));
         command
     }
 
@@ -158,17 +127,36 @@ impl Runner {
                 "{HEALTH}$env.config.use_ansi_coloring = true\n$health | table --expand --width {width}\n"
             ),
         };
-        let script = Script::Health.file();
-        let output = self
-            .nu_for(component)
-            .arg("-c")
-            .arg(program)
-            .output()
-            .context(SpawnSnafu { component: &component.id, script })?;
-        if !output.status.success() {
-            return ScriptSnafu {
+        self.answer(component, Action::Health.name(), &program)
+    }
+
+    /// Whether a component is added, as its present answers. A failure is a failure, never an
+    /// answer.
+    pub(crate) fn present(&self, component: &Component) -> RunnerResult<bool> {
+        let action = Action::Present.name();
+        let text = self.answer(component, action, "component present | to nuon\n")?;
+        match text.lines().last().map(str::trim) {
+            Some("true") => Ok(true),
+            Some("false") => Ok(false),
+            _ => ActionSnafu {
                 component: &component.id,
-                script,
+                action,
+                reason: format!("answered {text:?}, not a bool"),
+            }
+            .fail(),
+        }
+    }
+
+    /// What a program after a component's overlay writes to stdout, where it succeeds.
+    fn answer(&self, component: &Component, action: &str, program: &str) -> RunnerResult<String> {
+        let output = self
+            .program(component, program)
+            .output()
+            .context(SpawnSnafu { component: &component.id, action })?;
+        if !output.status.success() {
+            return ActionSnafu {
+                component: &component.id,
+                action,
                 reason: format!(
                     "exited {}: {}",
                     describe(output.status),
@@ -180,32 +168,37 @@ impl Runner {
         Ok(String::from_utf8_lossy(&output.stdout).trim_end().to_string())
     }
 
-    /// Whether a component is added, as its present script reports.
-    pub(crate) fn present(&self, component: &Component) -> RunnerResult<bool> {
-        let output = self
-            .command(component, Script::Present)
-            .stdout(Stdio::null())
-            .stderr(Stdio::piped())
-            .output()
-            .context(SpawnSnafu { component: &component.id, script: Script::Present.file() })?;
-        match output.status.code() {
-            Some(0) => Ok(true),
-            Some(1) => Ok(false),
-            _ => ScriptSnafu {
-                component: &component.id,
-                script: Script::Present.file(),
-                reason: format!(
-                    "exited {}: {}",
-                    describe(output.status),
-                    String::from_utf8_lossy(&output.stderr).trim()
-                ),
-            }
-            .fail(),
-        }
+    /// Holds a component's module to its component.toml: it parses, it exports every action listed,
+    /// and it exports nothing else.
+    pub(crate) fn contract(&self, component: &Component) -> RunnerResult<()> {
+        let text = self.answer(component, CONTRACT, &format!("{EXPORTS}\n"))?;
+        let exports: Vec<&str> = text.lines().filter_map(|line| line.trim().strip_prefix("component ")).collect();
+        let listed = component.actions.names();
+        let broken = if let Some(missing) = listed.iter().find(|name| !exports.contains(name)) {
+            format!("doesn't export {missing}, which actions lists")
+        } else if let Some(extra) = exports.iter().find(|name| !listed.contains(name)) {
+            format!("exports {extra}, which actions doesn't list")
+        } else {
+            return Ok(());
+        };
+        ActionSnafu { component: &component.id, action: CONTRACT, reason: broken }.fail()
     }
 
-    /// Every component's present script: the plain ones at once, then the super ones one at a
-    /// time, so only the first can ask for the password.
+    /// Every component's module held to its component.toml, at once.
+    pub(crate) fn contract_all(&self, catalog: &Catalog) -> RunnerResult<()> {
+        thread::scope(|scope| {
+            let running: Vec<_> =
+                catalog.components.iter().map(|component| scope.spawn(move || self.contract(component))).collect();
+            running
+                .into_iter()
+                .map(|check| check.join().expect("a contract check panicked"))
+                .collect::<RunnerResult<Vec<()>>>()
+        })?;
+        Ok(())
+    }
+
+    /// Every component's present: the plain ones at once, then the super ones one at a time, so
+    /// only the first can ask for the password.
     pub(crate) fn present_all(&self, catalog: &Catalog) -> RunnerResult<Vec<bool>> {
         let components = &catalog.components;
         let (supers, plain): (Vec<usize>, Vec<usize>) =
@@ -230,13 +223,12 @@ impl Runner {
 
     /// Runs a step with its output passed through to this process's own.
     pub(crate) fn step_inherit(&self, component: &Component, action: StepAction) -> RunnerResult<()> {
-        let script = action.script();
         let status = self
-            .command(component, script)
+            .command(component, action.action())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             .status()
-            .context(SpawnSnafu { component: &component.id, script: script.file() })?;
+            .context(SpawnSnafu { component: &component.id, action: action.label() })?;
         self.settle(component, action, status)
     }
 
@@ -247,10 +239,9 @@ impl Runner {
         action: StepAction,
         events: &mpsc::Sender<RunEvent>,
     ) -> RunnerResult<()> {
-        let script = action.script();
-        let spawn = SpawnSnafu { component: &component.id, script: script.file() };
+        let spawn = SpawnSnafu { component: &component.id, action: action.label() };
         let mut child = self
-            .command(component, script)
+            .command(component, action.action())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -309,28 +300,34 @@ impl Runner {
         })
     }
 
-    /// Checks a step's exit, then that the present script agrees with what ran.
+    /// Checks a step's exit, then that present agrees with what ran.
     fn settle(&self, component: &Component, action: StepAction, status: ExitStatus) -> RunnerResult<()> {
         if !status.success() {
-            return ScriptSnafu {
+            return ActionSnafu {
                 component: &component.id,
-                script: action.script().file(),
+                action: action.label(),
                 reason: format!("exited {}", describe(status)),
             }
             .fail();
         }
         let added = self.present(component)?;
-        if added != (action == StepAction::Add) {
+        if added != action.leaves_added() {
             let state = if added { "added" } else { "not added" };
-            return ScriptSnafu {
+            return ActionSnafu {
                 component: &component.id,
-                script: Script::Present.file(),
+                action: Action::Present.name(),
                 reason: format!("reports {state} after {}", action.label()),
             }
             .fail();
         }
         Ok(())
     }
+}
+
+/// A component's module taken as an overlay, its exports `component present` and so on.
+fn overlay(component: &Component) -> String {
+    let dir = run::nuon_string(&component.dir.display().to_string());
+    format!("overlay use --prefix {dir} as component\n")
 }
 
 /// Sends a stream's bytes to the TUI until it closes.

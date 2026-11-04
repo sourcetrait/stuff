@@ -7,14 +7,14 @@ pub(crate) type CatalogResult<T> = Result<T, CatalogError>;
 /// The runner's result.
 pub(crate) type RunnerResult<T> = Result<T, RunnerError>;
 
-/// A failure loading the components, running their scripts, or drawing.
+/// A failure loading the components, running their actions, or drawing.
 #[derive(Debug, snafu::Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum Error {
     /// The stuff directory failed to load.
     #[snafu(transparent)]
     Catalog { source: CatalogError },
-    /// A script failed to run or reported the wrong state.
+    /// An action failed to run or reported the wrong state.
     #[snafu(transparent)]
     Runner { source: RunnerError },
     /// The terminal failed to draw or read a key.
@@ -90,23 +90,23 @@ impl CatalogError {
     }
 }
 
-/// A failure running a component's script.
+/// A failure running a component's action.
 #[derive(Debug, snafu::Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum RunnerError {
     /// nu failed to start.
-    #[snafu(display("{component} {script}: starting nu: {source}"))]
-    Spawn { component: String, script: String, source: std::io::Error },
-    /// A script failed, or the present script disagreed with what ran.
-    #[snafu(display("{component} {script}: {reason}"))]
-    Script { component: String, script: String, reason: String },
+    #[snafu(display("{component} {action}: starting nu: {source}"))]
+    Spawn { component: String, action: String, source: std::io::Error },
+    /// An action failed, or present disagreed with what ran, or a module breaks its contract.
+    #[snafu(display("{component} {action}: {reason}"))]
+    Action { component: String, action: String, reason: String },
 }
 
 /// The kind of a [`RunnerError`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RunnerErrorKind {
     Spawn,
-    Script,
+    Action,
 }
 
 impl RunnerError {
@@ -114,7 +114,7 @@ impl RunnerError {
     pub fn kind(&self) -> RunnerErrorKind {
         match self {
             Self::Spawn { .. } => RunnerErrorKind::Spawn,
-            Self::Script { .. } => RunnerErrorKind::Script,
+            Self::Action { .. } => RunnerErrorKind::Action,
         }
     }
 }

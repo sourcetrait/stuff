@@ -49,6 +49,8 @@ pub(crate) enum Mark {
     ToAdd,
     /// To be removed.
     ToRemove,
+    /// Added, to be updated.
+    ToUpdate,
 }
 
 /// What a key or an event asks of the loop beyond the state.
@@ -133,6 +135,8 @@ pub(crate) struct App {
     pub(crate) adds: Vec<usize>,
     /// The components marked to remove.
     pub(crate) removes: Vec<usize>,
+    /// The components marked to update.
+    pub(crate) updates: Vec<usize>,
     /// Each component's mark, by index.
     pub(crate) marks: Vec<Mark>,
     /// The screen showing.
@@ -149,8 +153,8 @@ pub(crate) struct App {
     pub(crate) running: bool,
     /// The run's failure, when it failed.
     pub(crate) failure: Option<String>,
-    /// The components the run left in place, having no remove script, by index.
-    pub(crate) unsupported: Vec<usize>,
+    /// The steps the run passed over, their components not offering their actions.
+    pub(crate) unsupported: Vec<Step>,
     /// The sudo dialog, while sudo validates.
     pub(crate) sudo: Option<SudoDialog>,
     /// The health page, while it shows.
@@ -178,6 +182,7 @@ impl App {
             cursor: 0,
             adds: Vec::new(),
             removes: Vec::new(),
+            updates: Vec::new(),
             screen: Screen::Select,
             button: Button::Cancel,
             plan: Plan::default(),
@@ -225,11 +230,25 @@ impl App {
                 self.removes.retain(|&r| !catalog.remove_closure(&[r]).iter().any(|x| needed.contains(x)));
                 self.adds.push(i);
             }
+            Mark::ToUpdate => self.updates.retain(|&u| u != i),
             Mark::Added => {
                 let taken = catalog.remove_closure(&[i]);
                 self.adds.retain(|&a| !catalog.add_closure(&[a]).iter().any(|x| taken.contains(x)));
+                self.updates.retain(|u| !taken.contains(u));
                 self.removes.push(i);
             }
+        }
+        self.remark();
+    }
+
+    /// Marks the component under the cursor to update, or takes the mark off, where it is added and
+    /// offers the action.
+    fn toggle_update(&mut self) {
+        let Some(i) = self.current().filter(|&i| self.catalog.components[i].actions.update) else { return };
+        match self.marks[i] {
+            Mark::Added => self.updates.push(i),
+            Mark::ToUpdate => self.updates.retain(|&u| u != i),
+            _ => return,
         }
         self.remark();
     }
@@ -258,6 +277,10 @@ impl App {
         if self.screen == Screen::Select && code == Char('h') {
             return self.open_health();
         }
+        if self.screen == Screen::Select && code == Char('u') {
+            self.toggle_update();
+            return None;
+        }
         let code = match code {
             Char('w' | 'k') => Up,
             Char('s' | 'j') => Down,
@@ -274,7 +297,7 @@ impl App {
                 Right => self.descend(),
                 Char(' ') => self.toggle(),
                 Enter => {
-                    self.plan = Plan::new(&self.catalog, &self.added, &self.adds, &self.removes);
+                    self.plan = Plan::new(&self.catalog, &self.added, &self.adds, &self.removes, &self.updates);
                     if !self.plan.is_empty() {
                         self.scroll = 0;
                         self.screen = Screen::Preview;
@@ -346,9 +369,9 @@ impl App {
         None
     }
 
-    /// Opens the health page of the component under the cursor, where it has a health script.
+    /// Opens the health page of the component under the cursor, where it has a health action.
     fn open_health(&mut self) -> Option<Request> {
-        let i = self.current().filter(|&i| self.catalog.components[i].health)?;
+        let i = self.current().filter(|&i| self.catalog.components[i].actions.health)?;
         self.health = Some(HealthPage { component: i, table: None, failure: None, scroll: 0 });
         self.screen = Screen::Health;
         Some(Request::Health(i))
@@ -387,7 +410,7 @@ impl App {
         Some(Request::Cancel)
     }
 
-    /// The check after a run, through the sudo dialog where a present script is super.
+    /// The check after a run, through the sudo dialog where a present is super.
     fn check(&mut self) -> Request {
         if self.catalog.super_present() {
             self.sudo = Some(SudoDialog::new(Then::Check, false));
@@ -412,6 +435,7 @@ impl App {
                     let color = match action {
                         StepAction::Add => 32,
                         StepAction::Remove => 31,
+                        StepAction::Update => 36,
                     };
                     let title = &self.catalog.components[component].title;
                     self.output.note(&format!("\x1b[{color}m[{}]\x1b[0m {title}", action.label()));
@@ -471,25 +495,29 @@ impl App {
         Some(Request::Step(step))
     }
 
-    /// The first step from the one given that runs, past each removal whose component has no
-    /// remove script, which stays and is warned of at the run's end; none ends the run.
+    /// The first step from the one given that runs, past each whose component doesn't offer its
+    /// action, which is warned of at the run's end; none ends the run.
     fn runnable(&mut self, mut step: usize) -> Option<usize> {
-        while let Some(&Step { action, component }) = self.plan.steps.get(step) {
-            if action == StepAction::Add || self.catalog.components[component].removable {
+        while let Some(&found) = self.plan.steps.get(step) {
+            if self.catalog.components[found.component].actions.has(found.action.action()) {
                 return Some(step);
             }
-            self.unsupported.push(component);
+            self.unsupported.push(found);
             step += 1;
         }
         self.finish();
         None
     }
 
-    /// Ends the run, warning of each removal it left undone.
+    /// Ends the run, warning of each step it passed over; a run that succeeded then says what it
+    /// says just before its success.
     fn finish(&mut self) {
         self.running = false;
-        for &component in &self.unsupported {
-            self.output.note(&run::unsupported_remove(&self.catalog.components[component].id));
+        for step in &self.unsupported {
+            self.output.note(&run::unsupported(step.action, &self.catalog.components[step.component].id));
+        }
+        if self.failure.is_none() {
+            self.output.note(&run::fresh_login());
         }
     }
 
@@ -500,6 +528,7 @@ impl App {
         self.checked = true;
         self.adds.clear();
         self.removes.clear();
+        self.updates.clear();
         self.order = self.catalog.display_order(&self.added);
         self.cursor = current.and_then(|i| self.order.iter().position(|&o| o == i)).unwrap_or(0);
         self.screen = Screen::Select;
@@ -513,6 +542,7 @@ impl App {
         self.marks = (0..self.catalog.components.len())
             .map(|i| match (self.added[i], removing.contains(&i), adding.contains(&i)) {
                 (true, true, _) => Mark::ToRemove,
+                (true, false, _) if self.updates.contains(&i) => Mark::ToUpdate,
                 (true, false, _) => Mark::Added,
                 (false, _, true) => Mark::ToAdd,
                 (false, _, false) => Mark::Absent,
@@ -539,7 +569,7 @@ impl App {
 }
 
 /// Runs the TUI until the user leaves it, in the look given or the one the terminal gets. Where a
-/// present script is super, the first check waits on the sudo dialog.
+/// present is super, the first check waits on the sudo dialog.
 pub(crate) fn run(catalog: Catalog, runner: Runner, look: Option<Look>) -> Result<ExitCode> {
     let (mut app, first) = if catalog.super_present() {
         (App::unchecked(catalog), Some(Request::Validate))

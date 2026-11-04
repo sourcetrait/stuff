@@ -21,6 +21,7 @@ fn color(mark: Mark) -> image::Rgba<u8> {
         Mark::Absent | Mark::Added => image::Rgba([150, 150, 150, 255]),
         Mark::ToAdd => image::Rgba([40, 190, 90, 255]),
         Mark::ToRemove => image::Rgba([215, 60, 60, 255]),
+        Mark::ToUpdate => image::Rgba([50, 170, 200, 255]),
     }
 }
 

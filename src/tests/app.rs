@@ -25,9 +25,9 @@ fn proceed(app: &mut App, id: &str) -> Option<Request> {
     app.key(r::KeyCode::Enter)
 }
 
-/// The fixture, nothing added, git's add script super.
+/// The fixture, nothing added, git's add super.
 fn super_add() -> App {
-    App::new(catalog_with_supers("git", Supers { add: true, ..Supers::default() }), vec![false; 5])
+    App::new(catalog_with_supers("git", Actions { add: true, ..Actions::default() }), vec![false; 5])
 }
 
 #[test]
@@ -93,7 +93,7 @@ fn proceeding_walks_the_preview_and_the_dialog() {
     app.key(r::KeyCode::Char('d'));
     assert_eq!(app.key(r::KeyCode::Enter), Some(Request::Step(0)));
     assert_eq!(app.screen, Screen::Run);
-    assert!(app.sudo.is_none(), "a plan without super scripts needs no sudo");
+    assert!(app.sudo.is_none(), "a plan without super actions needs no sudo");
 }
 
 #[test]
@@ -212,7 +212,7 @@ fn escape_from_a_later_dialog_ends_the_run() {
 
 #[test]
 fn a_super_present_check_waits_on_the_dialog_and_escape_leaves() {
-    let present = Supers { present: true, ..Supers::default() };
+    let present = Actions { present: true, ..Actions::default() };
     let mut app = App::unchecked(catalog_with_supers("git", present));
     assert!(!app.checked);
     let sudo = app.sudo.as_ref().expect("the dialog");
@@ -222,8 +222,8 @@ fn a_super_present_check_waits_on_the_dialog_and_escape_leaves() {
 }
 
 #[test]
-fn a_removal_without_a_remove_script_is_skipped_and_warned_of_at_the_end() {
-    let catalog = catalog_with("rust/riscv", |spec| spec.removable = false);
+fn a_removal_without_a_remove_action_is_skipped_and_warned_of_at_the_end() {
+    let catalog = catalog_with("rust/riscv", |spec| spec.config.actions.remove = false);
     let mut app = App::new(catalog, vec![false, true, true, true, false]);
     assert_eq!(proceed(&mut app, "rust"), Some(Request::Step(0)), "nightly goes first");
     app.event(RunEvent::Begin { step: 0 });
@@ -232,13 +232,98 @@ fn a_removal_without_a_remove_script_is_skipped_and_warned_of_at_the_end() {
     assert_eq!(app.event(RunEvent::Done { step: 2 }), None);
     assert!(!app.running);
     assert!(app.failure.is_none(), "a warning, not a failure");
-    let last = app.output.lines().last().map(|line| String::from_utf8_lossy(line).into_owned());
-    assert_eq!(last.as_deref(), Some("\x1b[33m[stuff]\x1b[0m remove not supported: rust/riscv"));
+    let text: Vec<String> = app.output.lines().iter().map(|line| String::from_utf8_lossy(line).into_owned()).collect();
+    assert!(text.iter().any(|line| line == "\x1b[33m[stuff]\x1b[0m remove not supported: rust/riscv"), "{text:?}");
 }
 
 #[test]
-fn h_opens_the_health_page_of_a_component_with_a_health_script() {
-    let mut app = App::new(catalog_with("rust/nightly", |spec| spec.health = true), vec![false; 5]);
+fn a_successful_run_says_a_fresh_login_is_needed_as_its_last_line() {
+    let mut app = app([false; 5]);
+    proceed(&mut app, "git");
+    app.event(RunEvent::Begin { step: 0 });
+    app.event(RunEvent::Done { step: 0 });
+    let last = app.output.lines().last().map(|line| String::from_utf8_lossy(line).into_owned());
+    assert_eq!(last.as_deref(), Some("\x1b[34m[sysbox]\x1b[0m Environment changes require a fresh terminal login"));
+}
+
+#[test]
+fn a_failed_run_says_nothing_of_a_fresh_login() {
+    let mut app = app([false; 5]);
+    proceed(&mut app, "git");
+    app.event(RunEvent::Begin { step: 0 });
+    app.event(RunEvent::Fail { message: "git add: exited 1".to_string() });
+    assert!(!app.running);
+    let text: Vec<String> = app.output.lines().iter().map(|line| String::from_utf8_lossy(line).into_owned()).collect();
+    assert!(!text.iter().any(|line| line.contains("fresh terminal login")), "{text:?}");
+}
+
+/// The fixture, git added and offering update.
+fn updatable() -> App {
+    App::new(catalog_with("git", |spec| spec.config.actions.update = true), vec![true, false, false, false, false])
+}
+
+#[test]
+fn u_marks_an_added_component_to_update_and_takes_the_mark_off() {
+    let mut app = updatable();
+    at(&mut app, "git");
+    assert_eq!(app.key(r::KeyCode::Char('u')), None);
+    assert_eq!(app.marks[0], Mark::ToUpdate);
+    app.key(r::KeyCode::Char('u'));
+    assert_eq!(app.marks[0], Mark::Added);
+}
+
+#[test]
+fn u_does_nothing_where_the_component_does_not_offer_it_or_is_absent() {
+    let mut app = updatable();
+    at(&mut app, "rust");
+    app.key(r::KeyCode::Char('u'));
+    assert!(app.updates.is_empty(), "rust doesn't offer it");
+    let mut app = App::new(catalog_with("git", |spec| spec.config.actions.update = true), vec![false; 5]);
+    at(&mut app, "git");
+    app.key(r::KeyCode::Char('u'));
+    assert!(app.updates.is_empty(), "git is absent");
+}
+
+#[test]
+fn space_takes_an_update_mark_off_and_a_removal_takes_the_update_with_it() {
+    let mut app = updatable();
+    at(&mut app, "git");
+    app.key(r::KeyCode::Char('u'));
+    app.key(r::KeyCode::Char(' '));
+    assert_eq!(app.marks[0], Mark::Added);
+    assert!(app.updates.is_empty());
+    app.key(r::KeyCode::Char(' '));
+    assert_eq!(app.marks[0], Mark::ToRemove);
+    app.key(r::KeyCode::Char('u'));
+    assert_eq!(app.marks[0], Mark::ToRemove, "a removal isn't an update");
+}
+
+#[test]
+fn an_update_mark_makes_an_update_step() {
+    let mut app = updatable();
+    at(&mut app, "git");
+    app.key(r::KeyCode::Char('u'));
+    app.key(r::KeyCode::Enter);
+    assert_eq!(app.screen, Screen::Preview);
+    assert_eq!(app.plan.steps, vec![Step { action: StepAction::Update, component: 0 }]);
+    app.key(r::KeyCode::Enter);
+    app.key(r::KeyCode::Char('d'));
+    assert_eq!(app.key(r::KeyCode::Enter), Some(Request::Step(0)));
+}
+
+#[test]
+fn a_refresh_clears_the_update_marks() {
+    let mut app = updatable();
+    at(&mut app, "git");
+    app.key(r::KeyCode::Char('u'));
+    app.refresh(vec![true, false, false, false, false]);
+    assert!(app.updates.is_empty());
+    assert_eq!(app.marks[0], Mark::Added);
+}
+
+#[test]
+fn h_opens_the_health_page_of_a_component_with_a_health_action() {
+    let mut app = App::new(catalog_with("rust/nightly", |spec| spec.config.actions.health = true), vec![false; 5]);
     at(&mut app, "rust/nightly");
     let nightly = app.current().expect("a component");
     assert_eq!(app.key(r::KeyCode::Char('h')), Some(Request::Health(nightly)));
@@ -252,7 +337,7 @@ fn h_opens_the_health_page_of_a_component_with_a_health_script() {
 }
 
 #[test]
-fn h_does_nothing_where_the_component_has_no_health_script() {
+fn h_does_nothing_where_the_component_has_no_health_action() {
     let mut app = app([false; 5]);
     at(&mut app, "rust/nightly");
     assert_eq!(app.key(r::KeyCode::Char('h')), None);
@@ -262,7 +347,7 @@ fn h_does_nothing_where_the_component_has_no_health_script() {
 
 #[test]
 fn a_finished_run_rechecks_a_super_present_through_the_dialog() {
-    let present = Supers { present: true, ..Supers::default() };
+    let present = Actions { present: true, ..Actions::default() };
     let mut app = App::new(catalog_with_supers("rust/riscv", present), vec![false; 5]);
     proceed(&mut app, "git");
     app.event(RunEvent::Done { step: 0 });

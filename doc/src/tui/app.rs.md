@@ -7,8 +7,8 @@ looks, fancy and simple, the same row structure in each (look.rs).
 
 ## struct App
 
-The explicit marks, `adds` and `removes`, are what the user toggled; the
-marks shown are recomputed from them through the closures after every
+The explicit marks, `adds`, `removes`, and `updates`, are what the user toggled;
+the marks shown are recomputed from them through the closures after every
 change, so what a mark carries with it is always current.
 
 ### fn toggle
@@ -16,7 +16,14 @@ change, so what a mark carries with it is always current.
 Turning off a mark another mark carries turns off the marks that carry it:
 unmarking rust's addition unmarks nightly's. Marking an addition drops any
 removal that would take something it needs, and marking a removal drops any
-addition that needs what it takes, so the two sets never conflict.
+addition that needs what it takes, so the two sets never conflict. Marking a
+removal also drops an update of what it takes.
+
+### fn toggle_update
+
+`u` marks an added component to update where it offers the action, and takes the
+mark off; space takes it off too, so one press of space never turns an update
+into a removal. An update carries nothing with it.
 
 ### fn key
 
@@ -51,19 +58,20 @@ dialog shown before anything starts.
 
 ### fn runnable, fn finish
 
-A removal whose component has no remove.nu is passed over and the rest run;
-the run's end warns of each in the output, as the command line does on
-stderr.
+A step whose component doesn't offer its action is passed over and the rest run;
+the run's end warns of each in the output, as the command line does on stderr. A
+run that succeeded then notes the fresh login, the output's last line, right
+above the status line's `done`.
 
 ### fn open_health
 
 On the list, `h` is health's key, read before helix's `h` would move left; a
-component without a health script takes no page, the CLI's record for it being
-present.nu's answer alone.
+component without a health action takes no page, the CLI's record for it being
+present's answer alone.
 
 ### fn refresh
 
-After a run, every present script runs again rather than trusting the plan, and the
+After a run, every present runs again rather than trusting the plan, and the
 cursor stays on the component it was on.
 
 ## struct SudoDialog
@@ -75,9 +83,9 @@ whose credential lapsed shows once sudo asks.
 
 The terminal is entered before the picker queries it, and the look is settled
 before the icons load, since it decides whether they are drawn. ratatui's
-`init` installs the panic hook that restores the terminal. Where a present
-script is super, the first check waits on the dialog, its validation the
-loop's first request.
+`init` installs the panic hook that restores the terminal. Where a present is
+super, the first check waits on the dialog, its validation the loop's first
+request.
 
 ## fn serve
 

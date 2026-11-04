@@ -4,8 +4,8 @@
 
 ### fn load
 
-The directory is canonicalized first: every script gets absolute
-`STUFF_DIR` and `COMPONENT_DIR`, whatever path the command was given.
+The directory is canonicalized first, so every component's overlay takes an
+absolute path, whatever path the command was given.
 
 ### fn from_specs
 
@@ -34,16 +34,17 @@ the error.
 
 ### fn super_present
 
-Every present script runs when the TUI opens, so one super present script
-makes the first check wait on the sudo dialog.
+Every present runs when the TUI opens, so one super present makes the first
+check wait on the sudo dialog.
 
 ## fn collect
 
 A subdirectory is a subcomponent only when it holds a component.toml, so a
-component may keep other directories of its own for its scripts. Siblings
+component may keep other directories of its own for its module. Siblings
 are taken in name order, the order the list and the CLI show them.
 
-present.nu and add.nu are required; remove.nu is not, some things not
-removing well, and a removal passes over a component without one. health.nu
-is optional too, but brings health.nutype with it, the record's type being
-its reader's only description of it.
+mod.nu is the one required file beside the component.toml. What it offers is
+the component.toml's `actions`, which reads no nushell, so the graph loads
+without starting nu; {runner.rs} holds the two together. A health action brings
+health.nutype with it, the record's type being its reader's only description of
+it.

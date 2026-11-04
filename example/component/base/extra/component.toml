@@ -1,2 +1,3 @@
 title = "Extra"
 description = "A subcomponent, added after its parent"
+actions = ["present", "add", "remove"]

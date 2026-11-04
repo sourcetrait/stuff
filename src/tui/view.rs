@@ -12,15 +12,13 @@ const ADDED: r::Color = r::Color::Rgb(90, 150, 255);
 const TO_ADD: r::Color = r::Color::Rgb(70, 200, 110);
 /// The color of a component to remove: red, its title's in the simple look and the preview's rule.
 const TO_REMOVE: r::Color = r::Color::Rgb(235, 85, 85);
+/// The color of a component to update: cyan, its title's in the simple look and the preview's rule.
+const TO_UPDATE: r::Color = r::Color::Rgb(70, 195, 215);
 /// The sudo dialog's highlight: its border's and its title's.
 pub(crate) const YELLOW: r::Color = r::Color::Rgb(240, 200, 60);
 /// The sudo dialog's mini terminal, its cells inside its border: sudo's longest normal exchange in
 /// sysbox, its first-use lecture and three tries.
 pub(crate) const SUDO_TERMINAL: r::Size = r::Size { width: 70, height: 16 };
-/// The list's legend.
-pub(crate) const LEGEND_SELECT: &str = "<< [esc]     [w][a][s][d] [space]     [enter] >>";
-/// The list's legend where the highlighted component has a health script.
-pub(crate) const LEGEND_SELECT_HEALTH: &str = "<< [esc]     [w][a][s][d] [space] [h]ealth     [enter] >>";
 /// The health page's legend.
 pub(crate) const LEGEND_HEALTH: &str = "<< [esc]     [w][s]";
 /// The preview's legend.
@@ -146,6 +144,7 @@ fn shade(mark: Mark) -> Option<r::Color> {
         Mark::Added => Some(ADDED),
         Mark::ToAdd => Some(TO_ADD),
         Mark::ToRemove => Some(TO_REMOVE),
+        Mark::ToUpdate => Some(TO_UPDATE),
     }
 }
 
@@ -211,13 +210,14 @@ fn preview(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
     frame.render_widget(r::Paragraph::new(preview_lines(app, area.width)).scroll((app.scroll, 0)), area);
 }
 
-/// The preview's lines: a section for what will be installed and one for what will be uninstalled,
-/// each a heading, a sentence, a rule in its color as wide as given, and its components in the order
-/// they run; a section with none is left out.
+/// The preview's lines: a section for what will be installed, one for what will be uninstalled, and
+/// one for what will be updated, each a heading, a sentence, a rule in its color as wide as given,
+/// and its components in the order they run; a section with none is left out.
 pub(crate) fn preview_lines(app: &App, width: u16) -> Vec<r::Line<'_>> {
     let sections = [
         (StepAction::Add, "Installing", "The following components will be installed", TO_ADD),
         (StepAction::Remove, "Uninstalling", "The following components will be uninstalled", TO_REMOVE),
+        (StepAction::Update, "Updating", "The following components will be updated", TO_UPDATE),
     ];
     let mut lines = Vec::new();
     for (action, heading, sentence, color) in sections {
@@ -329,18 +329,29 @@ fn health_page(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
     frame.render_widget(r::Paragraph::new(text).scroll((page.scroll, 0)), table_area);
 }
 
+/// The list's legend, `[h]ealth` showing where the highlighted component has a health action and
+/// `[u]pdate` where it is added and offers the action.
+pub(crate) fn legend_select(health: bool, update: bool) -> String {
+    let health = if health { " [h]ealth" } else { "" };
+    let update = if update { " [u]pdate" } else { "" };
+    format!("<< [esc]     [w][a][s][d] [space]{health}{update}     [enter] >>")
+}
+
 /// The legend, quiet and centered at the bottom.
 fn legend(frame: &mut ratatui::Frame, area: r::Rect, app: &App) {
-    let health = app.current().is_some_and(|i| app.catalog.components[i].health);
+    let current = app.current();
+    let health = current.is_some_and(|i| app.catalog.components[i].actions.health);
+    let update = current.is_some_and(|i| {
+        app.catalog.components[i].actions.update && matches!(app.marks[i], Mark::Added | Mark::ToUpdate)
+    });
     let text = match app.screen {
-        _ if app.sudo.as_ref().is_some_and(|sudo| sudo.shown) => LEGEND_STEP,
-        _ if !app.checked => "",
-        Screen::Select if health => LEGEND_SELECT_HEALTH,
-        Screen::Select => LEGEND_SELECT,
-        Screen::Health => LEGEND_HEALTH,
-        Screen::Preview => LEGEND_PREVIEW,
-        Screen::Run if app.running => "",
-        _ => LEGEND_STEP,
+        _ if app.sudo.as_ref().is_some_and(|sudo| sudo.shown) => LEGEND_STEP.to_string(),
+        _ if !app.checked => String::new(),
+        Screen::Select => legend_select(health, update),
+        Screen::Health => LEGEND_HEALTH.to_string(),
+        Screen::Preview => LEGEND_PREVIEW.to_string(),
+        Screen::Run if app.running => String::new(),
+        _ => LEGEND_STEP.to_string(),
     };
     frame.render_widget(r::Paragraph::new(r::Line::styled(text, r::Style::new().fg(QUIET))).centered(), area);
 }

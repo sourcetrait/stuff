@@ -38,6 +38,11 @@ pub(crate) fn line(tone: Tone, message: &str) -> String {
     format!("\x1b[{color}m[stuff]\x1b[0m {message}")
 }
 
+/// What a successful run reports just before its success.
+pub(crate) fn fresh_login() -> String {
+    "\x1b[34m[sysbox]\x1b[0m Environment changes require a fresh terminal login".to_string()
+}
+
 /// Reports on the terminal, or loads the stuff, then runs the TUI or the action named.
 fn dispatch(cli: Cli) -> Result<ExitCode> {
     if cli.probe {
@@ -48,7 +53,8 @@ fn dispatch(cli: Cli) -> Result<ExitCode> {
         return UnknownStuffSnafu { name: source.display().to_string() }.fail();
     }
     let catalog = Catalog::load(&source)?;
-    let runner = Runner::new(&catalog.dir);
+    let runner = Runner::new();
+    runner.contract_all(&catalog)?;
     let Some(action) = cli.action else {
         return tui::app::run(catalog, runner, cli.look);
     };
@@ -60,20 +66,21 @@ fn dispatch(cli: Cli) -> Result<ExitCode> {
     }
     let added = runner.present_all(&catalog)?;
     if action.components().is_empty() {
-        list(&catalog, &added, kind == CliActionKind::Remove);
+        list(&catalog, &added, kind);
         return Ok(ExitCode::SUCCESS);
     }
     let picked = catalog.resolve(action.components())?;
     let plan = match kind {
-        CliActionKind::Add => Plan::new(&catalog, &added, &picked, &[]),
-        _ => Plan::new(&catalog, &added, &[], &picked),
+        CliActionKind::Add => Plan::new(&catalog, &added, &picked, &[], &[]),
+        CliActionKind::Update => Plan::new(&catalog, &added, &[], &[], &picked),
+        _ => Plan::new(&catalog, &added, &[], &picked, &[]),
     };
     execute(&catalog, &runner, &plan, kind)?;
     Ok(ExitCode::SUCCESS)
 }
 
 /// The health of the components picked, as NUON: a record for one, a record of records keyed by
-/// name for several. A component without a health script reports its present script's answer.
+/// name for several. A component without a health action reports its present's answer.
 fn health(catalog: &Catalog, runner: &Runner, picked: &[usize]) -> Result<String> {
     let mut records: Vec<(&str, String)> = Vec::with_capacity(picked.len());
     for &i in picked {
@@ -81,7 +88,7 @@ fn health(catalog: &Catalog, runner: &Runner, picked: &[usize]) -> Result<String
         if records.iter().any(|(id, _)| *id == component.id) {
             continue;
         }
-        let record = if component.health {
+        let record = if component.actions.health {
             runner.health(component, HealthForm::Nuon)?
         } else {
             let present = runner.present(component)?;
@@ -96,20 +103,25 @@ fn health(catalog: &Catalog, runner: &Runner, picked: &[usize]) -> Result<String
     Ok(format!("{{{}}}", fields.join(", ")))
 }
 
-/// A string as NUON writes it quoted.
-fn nuon_string(text: &str) -> String {
+/// A string as NUON and nu's own double quotes write it.
+pub(crate) fn nuon_string(text: &str) -> String {
     format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
-/// The warning a removal gives where its component has no remove script.
-pub(crate) fn unsupported_remove(id: &str) -> String {
-    line(Tone::Attention, &format!("remove not supported: {id}"))
+/// The warning a step gives where its component doesn't offer its action.
+pub(crate) fn unsupported(action: StepAction, id: &str) -> String {
+    line(Tone::Attention, &format!("{} not supported: {id}", action.label()))
 }
 
-/// Prints the components added, or those not, one a line.
-fn list(catalog: &Catalog, added: &[bool], want_added: bool) {
-    let shown: Vec<usize> =
-        catalog.display_order(added).into_iter().filter(|&i| added[i] == want_added).collect();
+/// Prints what an action with no names would accept, one a line: those not added, those added, or
+/// those added that can be updated.
+fn list(catalog: &Catalog, added: &[bool], kind: CliActionKind) {
+    let accepted = |i: usize| match kind {
+        CliActionKind::Add => !added[i],
+        CliActionKind::Update => added[i] && catalog.components[i].actions.update,
+        _ => added[i],
+    };
+    let shown: Vec<usize> = catalog.display_order(added).into_iter().filter(|&i| accepted(i)).collect();
     let width = shown.iter().map(|&i| catalog.components[i].id.len()).max().unwrap_or(0);
     for i in shown {
         let component = &catalog.components[i];
@@ -123,6 +135,7 @@ fn execute(catalog: &Catalog, runner: &Runner, plan: &Plan, kind: CliActionKind)
     if plan.is_empty() {
         let verb = match kind {
             CliActionKind::Add => "add",
+            CliActionKind::Update => "update",
             _ => "remove",
         };
         println!("{}", line(Tone::Info, &format!("nothing to {verb}")));
@@ -132,12 +145,12 @@ fn execute(catalog: &Catalog, runner: &Runner, plan: &Plan, kind: CliActionKind)
         let message = format!("plan: {} {}", step.action.label(), catalog.components[step.component].id);
         println!("{}", line(Tone::Info, &message));
     }
-    let mut unsupported = Vec::new();
+    let mut passed_over = Vec::new();
     let mut outcome = Ok(());
     for step in &plan.steps {
         let component = &catalog.components[step.component];
-        if step.action == StepAction::Remove && !component.removable {
-            unsupported.push(component.id.as_str());
+        if !component.actions.has(step.action.action()) {
+            passed_over.push((step.action, component.id.as_str()));
             continue;
         }
         println!("{}", line(Tone::Info, &format!("{} {}", step.action.label(), component.id)));
@@ -147,10 +160,11 @@ fn execute(catalog: &Catalog, runner: &Runner, plan: &Plan, kind: CliActionKind)
         }
     }
     if outcome.is_ok() {
+        println!("{}", fresh_login());
         println!("{}", line(Tone::Success, "done"));
     }
-    for id in unsupported {
-        eprintln!("{}", unsupported_remove(id));
+    for (action, id) in passed_over {
+        eprintln!("{}", unsupported(action, id));
     }
     outcome
 }

@@ -9,5 +9,5 @@ report on the terminal rather than work on components.
 
 ## enum CliAction
 
-`add` and `remove` with no names list rather than act, so an agent can see
-what each would accept before naming anything.
+`add`, `update`, and `remove` with no names list rather than act, so an agent
+can see what each would accept before naming anything.

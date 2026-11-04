@@ -13,6 +13,7 @@ pub(crate) struct Radios {
     added: Option<r::Protocol>,
     to_add: Option<r::Protocol>,
     to_remove: Option<r::Protocol>,
+    to_update: Option<r::Protocol>,
 }
 
 impl Radios {
@@ -24,6 +25,7 @@ impl Radios {
             added: radio(Mark::Added),
             to_add: radio(Mark::ToAdd),
             to_remove: radio(Mark::ToRemove),
+            to_update: radio(Mark::ToUpdate),
         }
     }
 
@@ -34,6 +36,7 @@ impl Radios {
             Mark::Added => self.added.as_ref(),
             Mark::ToAdd => self.to_add.as_ref(),
             Mark::ToRemove => self.to_remove.as_ref(),
+            Mark::ToUpdate => self.to_update.as_ref(),
         }
     }
 }

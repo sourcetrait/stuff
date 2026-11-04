@@ -8,12 +8,11 @@ pub(super) fn spec(id: &str, parent: Option<usize>, depends: &[&str]) -> Compone
             title: id.to_uppercase(),
             description: format!("the {id} component"),
             depends: depends.iter().map(|d| d.to_string()).collect(),
-            supers: Supers::default(),
+            actions: Actions { present: true, add: true, remove: true, ..Actions::default() },
+            supers: Actions::default(),
         },
         parent,
         dir: PathBuf::from("/stuff/component").join(id),
-        removable: true,
-        health: false,
     }
 }
 
@@ -30,11 +29,11 @@ fn specs() -> Vec<ComponentSpec> {
 
 /// The fixture catalog.
 pub(super) fn catalog() -> Catalog {
-    catalog_with_supers("git", Supers::default())
+    catalog_with_supers("git", Actions::default())
 }
 
-/// The fixture catalog, one component's scripts marked super.
-pub(super) fn catalog_with_supers(id: &str, supers: Supers) -> Catalog {
+/// The fixture catalog, one component's actions marked super.
+pub(super) fn catalog_with_supers(id: &str, supers: Actions) -> Catalog {
     catalog_with(id, |spec| spec.config.supers = supers)
 }
 
@@ -114,30 +113,77 @@ fn a_description_past_eighty_characters_is_refused() {
     let toml = ComponentConfigToml {
         title: Some("Long".to_string()),
         description: Some("x".repeat(81)),
+        actions: Some(vec!["present".to_string(), "add".to_string()]),
         ..ComponentConfigToml::default()
     };
     assert!(ComponentConfig::try_from(toml).is_err());
 }
 
-#[test]
-fn an_interface_block_marks_its_script_super() {
-    let toml: ComponentConfigToml =
-        toml::from_str("title = \"Claude Code\"\n\n[add]\nsuper = true\n\n[remove]\nsuper = true\n")
-            .expect("a component.toml");
-    let config = ComponentConfig::try_from(toml).expect("a config");
-    assert_eq!(config.supers, Supers { present: false, add: true, remove: true });
+/// A component.toml's text as a configuration, or why it is refused.
+fn config(text: &str) -> std::result::Result<ComponentConfig, String> {
+    let toml: ComponentConfigToml = toml::from_str(text).map_err(|error| error.to_string())?;
+    ComponentConfig::try_from(toml)
 }
 
 #[test]
-fn a_script_is_plain_unless_its_block_says_super() {
-    let toml: ComponentConfigToml =
-        toml::from_str("title = \"Rust\"\n\n[present]\n\n[add]\nsuper = false\n").expect("a component.toml");
-    assert_eq!(ComponentConfig::try_from(toml).expect("a config").supers, Supers::default());
+fn actions_and_super_are_lists_of_what_a_component_offers() {
+    let config = config(
+        "title = \"ChatGPT Codex\"\n\
+         actions = [\"present\", \"add\", \"update\", \"remove\", \"health\"]\n\
+         super = [\"add\", \"remove\"]\n",
+    )
+    .expect("a config");
+    assert_eq!(config.actions, Actions { present: true, add: true, update: true, remove: true, health: true });
+    assert_eq!(config.supers, Actions { add: true, remove: true, ..Actions::default() });
 }
 
 #[test]
-fn a_super_present_script_makes_the_check_need_sudo() {
+fn an_action_is_plain_unless_super_names_it() {
+    let config = config("title = \"Rust\"\nactions = [\"present\", \"add\"]\n").expect("a config");
+    assert_eq!(config.supers, Actions::default());
+}
+
+#[test]
+fn actions_must_be_there_with_the_required_ones_among_them() {
+    assert!(config("title = \"None\"\n").expect_err("no actions").contains("actions is missing"));
+    let lacking = config("title = \"Lacking\"\nactions = [\"add\"]\n").expect_err("no present");
+    assert!(lacking.contains("present"), "{lacking}");
+    let lacking = config("title = \"Lacking\"\nactions = [\"present\"]\n").expect_err("no add");
+    assert!(lacking.contains("add"), "{lacking}");
+}
+
+#[test]
+fn remove_update_and_health_are_optional() {
+    let config = config("title = \"Least\"\nactions = [\"present\", \"add\"]\n").expect("a config");
+    assert!(!config.actions.remove && !config.actions.update && !config.actions.health);
+}
+
+#[test]
+fn a_name_that_is_no_action_is_refused() {
+    let refused = config("title = \"Odd\"\nactions = [\"present\", \"add\", \"fix\"]\n").expect_err("no such action");
+    assert!(refused.contains("fix"), "{refused}");
+}
+
+#[test]
+fn super_may_name_only_what_actions_lists_and_never_health() {
+    let refused = config("title = \"Odd\"\nactions = [\"present\", \"add\"]\nsuper = [\"remove\"]\n")
+        .expect_err("not listed");
+    assert!(refused.contains("remove"), "{refused}");
+    let refused = config("title = \"Odd\"\nactions = [\"present\", \"add\", \"health\"]\nsuper = [\"health\"]\n")
+        .expect_err("health needs no sudo");
+    assert!(refused.contains("without sudo"), "{refused}");
+}
+
+#[test]
+fn a_key_of_a_component_s_own_is_refused() {
+    let refused = config("title = \"Odd\"\nactions = [\"present\", \"add\"]\npackage = \"x\"\n")
+        .expect_err("its own key belongs in its module");
+    assert!(refused.contains("package"), "{refused}");
+}
+
+#[test]
+fn a_super_present_makes_the_check_need_sudo() {
     assert!(!catalog().super_present());
-    let present = Supers { present: true, ..Supers::default() };
+    let present = Actions { present: true, ..Actions::default() };
     assert!(catalog_with_supers("rust/riscv", present).super_present());
 }

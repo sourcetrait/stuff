@@ -33,7 +33,46 @@ fn the_list_shows_the_title_the_cards_and_the_legend() {
     assert!(rows[0].contains("Test"), "{rows:#?}");
     assert!(rows.iter().any(|row| row.contains("RUST/NIGHTLY")), "{rows:#?}");
     assert!(rows.iter().any(|row| row.contains("the zed component")), "{rows:#?}");
-    assert!(rows[23].contains(tui::view::LEGEND_SELECT), "{rows:#?}");
+    assert!(rows[23].contains(&tui::view::legend_select(false, false)), "{rows:#?}");
+}
+
+#[test]
+fn the_legend_offers_update_and_health_where_the_highlighted_component_does() {
+    let catalog = super::catalog::catalog_with("git", |spec| {
+        spec.config.actions.update = true;
+        spec.config.actions.health = true;
+    });
+    let mut app = App::new(catalog, vec![true, false, false, false, false]);
+    app.cursor = app.order.iter().position(|&i| i == 0).expect("git listed");
+    assert!(find(&render(&app, 80, 24), "[h]ealth [u]pdate").is_some());
+    app.added[0] = false;
+    app.marks[0] = Mark::Absent;
+    let buffer = render(&app, 80, 24);
+    assert!(find(&buffer, "[h]ealth").is_some());
+    assert!(find(&buffer, "[u]pdate").is_none(), "an absent component takes no update");
+}
+
+#[test]
+fn the_preview_shows_what_will_be_updated_in_a_section_of_its_own() {
+    let mut app = App::new(catalog(), vec![true, false, false, false, false]);
+    app.plan = Plan { steps: vec![Step { action: StepAction::Update, component: 0 }] };
+    app.screen = Screen::Preview;
+    let buffer = render(&app, 80, 24);
+    assert!(find(&buffer, "Updating").is_some());
+    assert!(find(&buffer, "The following components will be updated").is_some());
+    assert!(find(&buffer, "Installing").is_none());
+    assert!(find(&buffer, "Uninstalling").is_none());
+}
+
+#[test]
+fn a_finished_run_shows_the_fresh_login_line_above_its_success() {
+    let mut app = App::new(catalog(), vec![false; 5]);
+    app.screen = Screen::Run;
+    app.output.note("\x1b[34m[sysbox]\x1b[0m Environment changes require a fresh terminal login");
+    let buffer = render(&app, 80, 24);
+    let (_, line_y) = find(&buffer, "Environment changes require a fresh terminal login").expect("the line");
+    let (_, done_y) = find(&buffer, "done").expect("the success");
+    assert!(line_y < done_y);
 }
 
 #[test]

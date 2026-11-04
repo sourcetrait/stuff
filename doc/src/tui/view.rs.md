@@ -32,7 +32,8 @@ title, the border still spanning the whole width.
 ## fn shade
 
 In the simple look a card has no box: its title takes its mark's color,
-blue added, green to add, red to remove, and an added component carries
+blue added, green to add, red to remove, cyan to update, and an added component
+carries
 `[present]` after its title, whatever its mark, so what is in the home reads
 plainly without a box to fill.
 
@@ -56,10 +57,11 @@ the loop, which bounds the preview's scroll by the body's rows.
 
 ## fn preview_lines
 
-What will be installed, then what will be uninstalled, each a heading, a
-sentence, a rule in the color of its action, and its components in the order
-they run, a section with none left out. The app counts the same lines to bound
-its scroll, the rule's width mattering only to the drawing.
+What will be installed, what will be uninstalled, then what will be updated,
+each a heading, a sentence, a rule in the color of its action, and its
+components in the order they run, a section with none left out. The app counts
+the same lines to bound its scroll, the rule's width mattering only to the
+drawing.
 
 ## fn confirm
 

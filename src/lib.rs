@@ -31,13 +31,13 @@ pub(crate) mod r {
 pub(crate) use crate::{
     catalog::{Catalog, Component},
     cli::{Cli, CliActionKind},
-    config::{ComponentConfig, ComponentConfigToml, StuffConfig, StuffConfigToml, Supers},
+    config::{Action, Actions, ComponentConfig, ComponentConfigToml, StuffConfig, StuffConfigToml},
     error::{
-        CatalogResult, GraphSnafu, LayoutSnafu, ParseSnafu, ReadSnafu, RunnerResult, ScriptSnafu,
+        ActionSnafu, CatalogResult, GraphSnafu, LayoutSnafu, ParseSnafu, ReadSnafu, RunnerResult,
         SpawnSnafu, TerminalSnafu, UnknownSnafu, UnknownStuffSnafu,
     },
     plan::{Plan, Step, StepAction},
-    runner::{HealthForm, RunEvent, Runner, Script},
+    runner::{HealthForm, RunEvent, Runner},
     sudo::{Secret, Validation},
     tui::{
         app::{App, Button, Look, Mark, Screen, SudoDialog},

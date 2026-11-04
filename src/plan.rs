@@ -1,31 +1,36 @@
-//! A plan: the removals and additions a selection needs, in the order they run.
+//! A plan: the removals, additions, and updates a selection needs, in the order they run.
 
 use crate::*;
 
 /// What a step does to its component.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum StepAction {
-    /// Runs the component's add script.
+    /// Calls the component's add.
     Add,
-    /// Runs the component's remove script.
+    /// Calls the component's remove.
     Remove,
+    /// Calls the component's update.
+    Update,
 }
 
 impl StepAction {
-    /// The script the step runs.
-    pub(crate) fn script(self) -> Script {
+    /// The action the step calls.
+    pub(crate) fn action(self) -> Action {
         match self {
-            Self::Add => Script::Add,
-            Self::Remove => Script::Remove,
+            Self::Add => Action::Add,
+            Self::Remove => Action::Remove,
+            Self::Update => Action::Update,
         }
     }
 
     /// The step's label, as the preview shows it.
     pub(crate) fn label(self) -> &'static str {
-        match self {
-            Self::Add => "add",
-            Self::Remove => "remove",
-        }
+        self.action().name()
+    }
+
+    /// Whether the component is added once the step has run.
+    pub(crate) fn leaves_added(self) -> bool {
+        self != Self::Remove
     }
 }
 
@@ -38,7 +43,8 @@ pub(crate) struct Step {
     pub(crate) component: usize,
 }
 
-/// The steps in order: removals, dependents first; then additions, requirements first.
+/// The steps in order: removals, dependents first; additions, requirements first; then updates,
+/// requirements first.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct Plan {
     /// The steps, in the order they run.
@@ -46,8 +52,9 @@ pub(crate) struct Plan {
 }
 
 impl Plan {
-    /// The plan adding `add` and removing `remove`, with what each needs.
-    pub(crate) fn new(catalog: &Catalog, added: &[bool], add: &[usize], remove: &[usize]) -> Self {
+    /// The plan adding `add` and removing `remove`, with what each needs, and updating `update`,
+    /// those added that stay.
+    pub(crate) fn new(catalog: &Catalog, added: &[bool], add: &[usize], remove: &[usize], update: &[usize]) -> Self {
         let removing: Vec<usize> =
             catalog.remove_closure(remove).into_iter().filter(|&i| added[i]).collect();
         let adding: Vec<usize> = catalog
@@ -55,10 +62,17 @@ impl Plan {
             .into_iter()
             .filter(|&i| !added[i] && !removing.contains(&i))
             .collect();
+        let updating: Vec<usize> = catalog
+            .add_closure(update)
+            .into_iter()
+            .filter(|&i| update.contains(&i) && added[i] && !removing.contains(&i))
+            .collect();
+        let step = |action: StepAction| move |component: usize| Step { action, component };
         let steps = removing
             .into_iter()
-            .map(|component| Step { action: StepAction::Remove, component })
-            .chain(adding.into_iter().map(|component| Step { action: StepAction::Add, component }))
+            .map(step(StepAction::Remove))
+            .chain(adding.into_iter().map(step(StepAction::Add)))
+            .chain(updating.into_iter().map(step(StepAction::Update)))
             .collect();
         Self { steps }
     }
@@ -68,12 +82,12 @@ impl Plan {
         self.steps.is_empty()
     }
 
-    /// Whether the plan needs sudo: a step's script is super, or its component's present script,
-    /// which runs again after the step.
+    /// Whether the plan needs sudo: a step's action is super, or its component's present, which
+    /// runs again after the step.
     pub(crate) fn needs_sudo(&self, catalog: &Catalog) -> bool {
         self.steps.iter().any(|step| {
             let supers = catalog.components[step.component].supers;
-            supers.of(step.action.script()) || supers.present
+            supers.has(step.action.action()) || supers.present
         })
     }
 }

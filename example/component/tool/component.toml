@@ -1,3 +1,4 @@
 title = "Tool"
 description = "Depends on base, added after it"
 depends = ["base"]
+actions = ["present", "add", "update", "remove"]
