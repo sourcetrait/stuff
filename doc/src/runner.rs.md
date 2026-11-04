@@ -30,10 +30,11 @@ user config, where nu exits 1 with nothing run, is never taken as absent.
 ### fn contract
 
 A module's exports, read by `scope commands` after its overlay, which names them
-alone, private helpers left out, must be exactly `actions`. nu's type checks
-stop at a literal, so this and the answers' own checks are what hold a module to
-its contract at runtime. The check needs the user's config for a module that
-reaches their libraries.
+alone, private helpers left out, must be exactly `actions`. nu's type checks are
+partial, measured on 0.116.1: `['yes'] | first` passes `-> bool`, while a record
+of the wrong fields can fail its signature at runtime, so this and the answers'
+own checks are what hold a module to its contract. The check needs the user's
+config for a module that reaches their libraries.
 
 ### fn present_all
 
