@@ -128,6 +128,9 @@ fn fetch(uri: &str) -> SourceResult<PathBuf> {
     let root = xdg_home("XDG_CACHE_HOME", ".cache")?.join(FETCHED_DIR);
     std::fs::create_dir_all(&root).context(FetchDirSnafu { uri })?;
     let dir = root.join(fetched_name(uri));
+    // Held to the end of this fetch: another's clone in progress would look like one that failed.
+    let lock = std::fs::File::create(root.join(format!("{}.lock", fetched_name(uri)))).context(FetchDirSnafu { uri })?;
+    lock.lock().context(FetchDirSnafu { uri })?;
     eprintln!("{}", line(Tone::Info, &format!("fetching {uri}")));
     if dir.join(".git").is_dir() {
         for args in [

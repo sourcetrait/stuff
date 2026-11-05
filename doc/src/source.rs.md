@@ -34,7 +34,9 @@ The directory kept for it is a cache, reset and cleaned, so nothing a component
 wrote into it outlasts the next run.
 
 A clone lands in a `.partial` directory and is renamed into place, so one cut off
-part way leaves nothing later taken for stuff.
+part way leaves nothing later taken for stuff. Two fetches of one URI wait on each
+other by a lock file beside it, which its holder's end releases: each would
+otherwise take the other's clone in progress for one cut off, and remove it.
 
 Everything Stuff and git say goes to stderr, each git command told `-q`: stdout
 stays what agents read, a list or a health record.

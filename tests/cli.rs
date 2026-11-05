@@ -186,6 +186,22 @@ fn a_uri_is_fetched_then_worked_on_as_a_directory() {
 }
 
 #[tested]
+fn two_cold_fetches_of_a_uri_both_land() {
+    let t = testing::test!({ .using_temp_dir() });
+    let (dir, home) = fixture(t.temp_dir());
+    committed(&dir);
+    let remote = Some((URI, dir.as_path()));
+    let outputs = std::thread::scope(|scope| {
+        let runs: Vec<_> = (0..4).map(|_| scope.spawn(|| from_source(URI, &home, &home, remote, &["add"]))).collect();
+        runs.into_iter().map(|run| run.join().expect("a run")).collect::<Vec<_>>()
+    });
+    for output in &outputs {
+        assert!(output.status.success(), "{}", stderr(output));
+        assert!(ids(output).contains(&"base".to_string()), "{}", stdout(output));
+    }
+}
+
+#[tested]
 fn a_uri_failing_to_fetch_fails_the_command() {
     let t = testing::test!({ .using_temp_dir() });
     let (_, home) = fixture(t.temp_dir());
@@ -195,8 +211,12 @@ fn a_uri_failing_to_fetch_fails_the_command() {
     assert!(stderr(&refused).contains(&format!("fetching {URI}: git")), "{}", stderr(&refused));
     assert!(!stderr(&refused).contains("what stuff?"), "{}", stderr(&refused));
     let source = home.join(".cache/stuff/source");
-    let left = std::fs::read_dir(&source).expect("its directory").count();
-    assert_eq!(left, 0, "nothing left in {}", source.display());
+    let left: Vec<_> = std::fs::read_dir(&source)
+        .expect("its directory")
+        .map(|entry| entry.expect("an entry").file_name())
+        .filter(|name| !name.to_string_lossy().ends_with(".lock"))
+        .collect();
+    assert!(left.is_empty(), "{left:?} left in {}", source.display());
 }
 
 #[tested]
